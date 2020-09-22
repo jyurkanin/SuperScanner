@@ -26,16 +26,9 @@
 typedef unsigned char MidiByte; //ugh
 
 
-float synthesize(int n, int t, int s, int volume, int& state);
-float synthesize(float freq, int t, int s, int volume, int& state);
-float synthesize_portamento(int curr, int last, int t, int s, int volume, int& state);
-
-void load_program(char* filename);
-void save_program(char* filename);
-
-int init_alsa();
-int exit_alsa();
+int init_audio();
+int del_audio();
 int init_midi(int argc, char *argv[]);
-int exit_midi();
+int del_midi();
 void *midi_loop(void *arg);
 void *audio_thread(void *arg);

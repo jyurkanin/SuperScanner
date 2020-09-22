@@ -1,32 +1,21 @@
 #include "super_scanner.h"
 #include "scanner_window.h"
 
-int is_program_running_ = 0;
-
-void start_program(){
-    is_program_running_ = 1;
+int is_window_open_ = 0;
+int is_window_open(){
+  return is_window_open_;
 }
 
-void stop_program(){
-    is_program_running_ = 0;
+SuperScanner::SuperScanner(){
+  is_window_open_ = 1;
 }
 
-int is_program_running(){
-    return is_program_running_;
+SuperScanner::~SuperScanner(){
+  is_window_open_ = 0;
 }
 
-SuperScanner *get_scanner(){
-    return super_scanner;
+float SuperScanner::tick(int note, float volume){
+  float freq = freqs[(note-21) % 12] * (1 << (1+(int)(note-21)/12));
+  return freq;
 }
 
-
-int main(){
-    init_window();
-    while(is_window_alive()){
-        
-    }
-    printf("bromine\n");
-    del_window();
-    printf("brotato chip\n");
-    
-}
