@@ -181,23 +181,6 @@ int rainbow(int c){
   
 }
 
-void runge_kutta(float *X, float *Xt1, void (ode)(float*,float*), float ts, int len){
-    float temp[3];
-    float k1[3]; ode(X, k1); //Calculate derivative.
-    
-    for(int i = 0; i < len; i++) temp[i] = X[i]+.5*ts*k1[i];
-    float k2[3]; ode(temp, k2);
-    
-    for(int i = 0; i < len; i++) temp[i] = X[i]+.5*ts*k2[i];
-    float k3[3]; ode(temp, k3);
-    
-    for(int i = 0; i < len; i++) temp[i] = X[i]+ts*k3[i];
-    float k4[3]; ode(temp, k4);
-    
-    for(int i = 0; i < len; i++){
-        Xt1[i] = X[i] + (ts/6)*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i]);
-    }
-}
 
 void lorenz_ode(float *X, float *Xd){
     float sigma = 10;

@@ -20,8 +20,6 @@ int sustain = 0;
 SuperScanner *scanner;
 
 
-Controller controller;
-
 
 void breakOnMe(){
   //break me on, Break on meeeeeee
@@ -120,7 +118,6 @@ int init_midi(int argc, char *argv[]){
   pthread_create(&piano_midi_thread, NULL, &midi_loop, NULL);
   pthread_create(&m_thread, NULL, &audio_thread, NULL);
   
-  controller.activate();
   return Controller::init_controller(argc, argv);
 }
 

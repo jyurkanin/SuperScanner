@@ -26,7 +26,7 @@
 typedef unsigned char MidiByte; //ugh
 
 
-int init_audio();
+int init_audio(SuperScanner *s);
 int del_audio();
 int init_midi(int argc, char *argv[]);
 int del_midi();

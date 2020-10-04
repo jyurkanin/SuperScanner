@@ -122,7 +122,7 @@ void *Controller::read_controller(void *nothing){
   has_new = 1;
   std::queue<unsigned char> incoming;
   unsigned char temp;
-  while(is_program_running()){
+  while(is_window_open()){
     if(read(controllerFD, &temp, sizeof(temp)) <= 0){
       usleep(1000);
       continue;
