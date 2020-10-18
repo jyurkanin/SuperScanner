@@ -1,0 +1,28 @@
+SuperScanner Todo List
+
+* DONE Implement Network ODE
+
+* DONE Integrate with Existing Code
+** DONE AudioEngine integration
+** DONE Midi Integration
+** DONE Final touches
+   Implement tick function.
+   Implement strike function. Easy. Done
+
+* DONE Create Minimal GUI with Scanner visualization.
+  Damn. Huge pain. Fuck.
+  Don't worry about changing any parameters yet.
+  Just exiting and saving/loading configuration maybe.
+  Need to have a way to switch from stereoscopic to 
+  regular visualization.
+
+
+* TODO Test Simple Wave Scanner
+  In-Progress. No working. Scanner apparently has numerous bugs that I will have to
+  work through.
+
+
+  
+
+
+
