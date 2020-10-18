@@ -1,3 +1,5 @@
+#pragma once
+
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
@@ -12,6 +14,7 @@
   #undef Success
 #endif
 #include <eigen3/Eigen/Dense>
+#include "super_scanner.h"
 
 
 
@@ -47,10 +50,9 @@ typedef struct{
 
 
 
-void init_window();
+void init_window(SuperScanner *s);
 void del_window();
 void* window_thread(void*);
-int is_window_alive();
 
 
 int rainbow(int c);
@@ -60,6 +62,9 @@ StereoPixels projection_to_pixels(ProjectedPoints pp);
 void draw_stereo_line(Vector3f start_point, Vector3f end_point);
 void draw_stereo_point(Vector3f point);
 void draw_stereo_sphere(Sphere sphere);
+
+void draw_stereo_lines(Vector3f *start_point, Vector3f *end_point, int len);
+void draw_stereo_points(Vector3f *point, int len);
 
 
 void runge_kutta(float *X, float *Xt1, void (ode)(float*,float*), float ts, int len);

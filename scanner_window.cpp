@@ -1,26 +1,77 @@
 #include "scanner_window.h"
+#include "super_scanner.h"
 
 
 Display *dpy;
 Window w;
 GC gc;
 pthread_t w_thread;
-volatile int is_window_alive_;
+static SuperScanner *scanner;
 
+void breakerbreaker(){}
 
-Vector3f origin = {0,0,0};
+Vector3f origin = {-10,0,0};
 
-int is_window_alive() {
-    return is_window_alive_;
+//draw all connections.
+void draw_scanner(Display *dpy, Window w, GC gc){
+  int actual_len = 0;
+  int num_nodes = scanner->num_nodes;
+  Vector3f start[1+(num_nodes*num_nodes/2)]; //throw in a random +1 to avoid off by one errors. in case num_nodes=7, 7*7/2 = 49/2 = 24.5 = 24 which would be one less than needed.
+  Vector3f end[1+(num_nodes*num_nodes/2)];
+  
+  draw_stereo_points(scanner->node_pos, num_nodes);
+  
+  for(int i = 0; i < num_nodes; i++){ //row
+    for(int j = i; j < num_nodes; j++){ //column. //searches only upper Triangluar part.
+      if(scanner->stiffness_matrix[(i*num_nodes)+j] > 0){ //connection exists. Add to list.
+	start[actual_len] = scanner->node_pos[i];
+	end[actual_len] = scanner->node_pos[j];
+	actual_len++;
+      }
+    }
+  }
+  
+  draw_stereo_lines(start, end, actual_len);
 }
+
 
 void* window_thread(void*){
+  XEvent e;
+  char buf[2];
+  
+  XSetBackground(dpy, gc, 0);
+  while(is_window_open()){
+    XClearWindow(dpy, w);
+    draw_scanner(dpy, w, gc);
+    scanner->update_params();
     
-    return 0;
+    if(XPending(dpy) > 0){
+      XNextEvent(dpy, &e);
+      if(e.type == KeyPress){
+	XLookupString(&e.xkey, buf, 1, NULL, NULL);
+	switch(buf[0]){
+	case 'p':
+	  scanner->sim_mutex = 1;
+	  break;
+	case 'r':
+	  scanner->sim_mutex = 0;
+	  break;
+	  
+	}
+      }
+    }
+    
+    XFlush(dpy);
+    usleep(1000);
+  }
+  return 0;
 }
 
-void init_window(){
-    dpy = XOpenDisplay(":0.0");
+
+void init_window(SuperScanner *s){
+    scanner = s;
+  
+    dpy = XOpenDisplay(0);
     w = XCreateSimpleWindow(dpy, DefaultRootWindow(dpy), 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0, 0);
 
     Atom wm_state   = XInternAtom (dpy, "_NET_WM_STATE", true );
@@ -31,7 +82,6 @@ void init_window(){
     XClearWindow(dpy, w);
     XMapWindow(dpy, w);
     gc = XCreateGC(dpy, w, 0, 0);
-    is_window_alive_ = 1;
     
     XEvent e;
     do{
@@ -107,6 +157,55 @@ StereoPixels projection_to_pixels(ProjectedPoints pp){
         sp.yr = floor(-pp.phi_r*scale_y + SCREEN_HEIGHT/2);
     }
     return sp;
+}
+
+void draw_stereo_lines(Vector3f *start_point, Vector3f *end_point, int len){
+  ProjectedPoints pp_start;
+  ProjectedPoints pp_end;
+
+  StereoPixels sp_start;
+  StereoPixels sp_end;
+  XSegment segments[2*len];
+  
+  for(int i = 0; i < len; i++){
+    pp_start = project_point(start_point[i], origin);
+    pp_end = project_point(end_point[i], origin);
+    sp_start = projection_to_pixels(pp_start);
+    sp_end = projection_to_pixels(pp_end);
+    
+    segments[2*i].x1 = sp_start.xl;
+    segments[2*i].y1 = sp_start.yl;
+    segments[2*i].x2 = sp_end.xl;
+    segments[2*i].y2 = sp_end.yl;
+
+    segments[(2*i)+1].x1 = sp_start.xr;
+    segments[(2*i)+1].y1 = sp_start.yr;
+    segments[(2*i)+1].x2 = sp_end.xr;
+    segments[(2*i)+1].y2 = sp_end.yr;
+
+    printf("Segment %d %d %d %d\n", segments[2*i].x1, segments[2*i].y1, segments[2*i].x2, segments[2*i].y2); //LEFTOFF
+  }
+  breakerbreaker();
+  
+  XSetForeground(dpy, gc, 0xFF0000);
+  XDrawSegments(dpy, w, gc, segments, 2*len);
+}
+
+void draw_stereo_points(Vector3f *points, int len){
+  ProjectedPoints pp; 
+  StereoPixels sp;
+  XPoint xpoints[2*len];
+  for(int i = 0; i < len; i++){
+    pp = project_point(points[i], origin);
+    sp = projection_to_pixels(pp);
+    xpoints[(2*i)].x = sp.xl;
+    xpoints[(2*i)].y = sp.yl;
+    xpoints[(2*i)+1].x = sp.xr;
+    xpoints[(2*i)+1].y = sp.yr;
+  }
+
+  XSetForeground(dpy, gc, 0xFF);
+  XDrawPoints(dpy, w, gc, xpoints, 2*len, CoordModeOrigin);
 }
 
 void draw_stereo_line(Vector3f start_point, Vector3f end_point){

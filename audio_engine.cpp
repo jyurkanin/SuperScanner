@@ -1,5 +1,4 @@
 #include "audio_engine.h"
-#include "super_scanner.h"
 #include <fstream>
 #include <iostream>
 #include <fcntl.h>
@@ -17,7 +16,7 @@ MidiByte midiNotesReleased[0xFF]; //records the notes just released
 MidiByte midiNotesSustained[0xFF];
 int sustain = 0;
 
-SuperScanner *scanner;
+static SuperScanner *scanner;
 
 
 
@@ -69,11 +68,13 @@ void *audio_thread(void *arg){
 	  }
 	}
       }
-      
-      for(int j = 0; j < frames_to_deliver; j++){
-	sum_frames[j] = scanner->tick(curr_note, volume);
-	stereo_frames[2*j] = sum_frames[j];
-	stereo_frames[2*j + 1] = sum_frames[j];
+
+      if(curr_note != -1){
+	for(int j = 0; j < frames_to_deliver; j++){
+	  sum_frames[j] = scanner->tick(curr_note, volume);
+	  stereo_frames[2*j] = sum_frames[j];
+	  stereo_frames[2*j + 1] = sum_frames[j];
+	}
       }
       
       /*

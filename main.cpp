@@ -3,14 +3,19 @@
 #include "audio_engine.h"
 
 int main(int argc, char *argv[]){
-  SuperScanner scanner;
+  if(argc < 2 ){
+    printf("usage ./scan <midi keyboard> <midi controller>\n");
+    exit(-1);
+  }
   
+  SuperScanner scanner(128);
+
+  init_audio(&scanner); //this has to go first apparently.
   init_midi(argc, argv);
-  init_audio(&scanner);
   
-  init_window();
+  init_window(&scanner);
   scanner.start();
-  while(is_window_alive()){
+  while(is_window_open()){
     usleep(1000); //to prevent is_window_open from burning cycles.
   }
   scanner.stop();
