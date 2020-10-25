@@ -10,7 +10,7 @@ static SuperScanner *scanner;
 
 void breakerbreaker(){}
 
-Vector3f origin = {-10,0,0};
+Vector3f origin = {-3,8,0};
 
 //draw all connections.
 void draw_scanner(Display *dpy, Window w, GC gc){
@@ -18,51 +18,93 @@ void draw_scanner(Display *dpy, Window w, GC gc){
   int num_nodes = scanner->num_nodes;
   Vector3f start[1+(num_nodes*num_nodes/2)]; //throw in a random +1 to avoid off by one errors. in case num_nodes=7, 7*7/2 = 49/2 = 24.5 = 24 which would be one less than needed.
   Vector3f end[1+(num_nodes*num_nodes/2)];
+  Vector3f node_pos_rot[scanner->num_nodes];
   
-  draw_stereo_points(scanner->node_pos, num_nodes);
+  Matrix3f rot = get_rotation(0, -.1, 0);
   
   for(int i = 0; i < num_nodes; i++){ //row
+    node_pos_rot[i] = rot*scanner->node_pos[i];
     for(int j = i; j < num_nodes; j++){ //column. //searches only upper Triangluar part.
       if(scanner->stiffness_matrix[(i*num_nodes)+j] > 0){ //connection exists. Add to list.
-	start[actual_len] = scanner->node_pos[i];
-	end[actual_len] = scanner->node_pos[j];
+	start[actual_len] = rot*scanner->node_pos[i];
+	end[actual_len] = rot*scanner->node_pos[j];
 	actual_len++;
       }
     }
   }
   
   draw_stereo_lines(start, end, actual_len);
+  draw_stereo_points(node_pos_rot, num_nodes);
+}
+
+void handle_scanner_events(Display *dpy, Window w, GC gc){
+  if(XPending(dpy) > 0){
+    XNextEvent(dpy, &e);
+    if(e.type == KeyPress){
+      XLookupString(&e.xkey, buf, 1, NULL, NULL);
+      switch(buf[0]){
+      case 'p':
+	scanner->sim_mutex = 1;
+	break;
+      case 'r':
+	scanner->sim_mutex = 0;
+	break;
+      case 'x':
+	scanner->stop();
+	return 0;
+      }
+    }
+  }
+}
+
+void draw_scan_path_menu(Display *dpy, Window w, GC gc){
+
+}
+
+void handle_scan_path_events(Display *dpy, Window w, GC gc){
+  if(XPending(dpy) > 0){
+    XNextEvent(dpy, &e);
+    if(e.type == KeyPress){
+      XLookupString(&e.xkey, buf, 1, NULL, NULL);
+      switch(buf[0]){
+      case 'p':
+	scanner->sim_mutex = 1;
+	break;
+      case 'r':
+	scanner->sim_mutex = 0;
+	break;
+      case 'x':
+	scanner->stop();
+	return 0;
+      }
+    }
+  }
 }
 
 
 void* window_thread(void*){
   XEvent e;
   char buf[2];
+
+  int menu_id = SCANNER_3D_MENU;
   
   XSetBackground(dpy, gc, 0);
   while(is_window_open()){
     XClearWindow(dpy, w);
-    draw_scanner(dpy, w, gc);
+    switch(menu_id){
+    case SCANNER_3D_MENU:
+      draw_scanner(dpy, w, gc);
+      handle_scanner_events(dpy, w, gc);
+      break;
+    case SCAN_PATH_MENU:
+      draw_scan_path_menu(dpy, w, gc);
+      handle_scan_path_events(dpy, w, gc);
+      break;      
+    }
     scanner->update_params();
     
-    if(XPending(dpy) > 0){
-      XNextEvent(dpy, &e);
-      if(e.type == KeyPress){
-	XLookupString(&e.xkey, buf, 1, NULL, NULL);
-	switch(buf[0]){
-	case 'p':
-	  scanner->sim_mutex = 1;
-	  break;
-	case 'r':
-	  scanner->sim_mutex = 0;
-	  break;
-	  
-	}
-      }
-    }
-    
     XFlush(dpy);
-    usleep(1000);
+    usleep(10000); //update 100 times a second.
   }
   return 0;
 }
@@ -183,9 +225,8 @@ void draw_stereo_lines(Vector3f *start_point, Vector3f *end_point, int len){
     segments[(2*i)+1].x2 = sp_end.xr;
     segments[(2*i)+1].y2 = sp_end.yr;
 
-    printf("Segment %d %d %d %d\n", segments[2*i].x1, segments[2*i].y1, segments[2*i].x2, segments[2*i].y2); //LEFTOFF
+    //    printf("Segment %d %d %d %d\n", segments[2*i].x1, segments[2*i].y1, segments[2*i].x2, segments[2*i].y2); //LEFTOFF
   }
-  breakerbreaker();
   
   XSetForeground(dpy, gc, 0xFF0000);
   XDrawSegments(dpy, w, gc, segments, 2*len);

@@ -8,7 +8,7 @@ int main(int argc, char *argv[]){
     exit(-1);
   }
   
-  SuperScanner scanner(128);
+  SuperScanner scanner(16);
 
   init_audio(&scanner); //this has to go first apparently.
   init_midi(argc, argv);

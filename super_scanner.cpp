@@ -3,6 +3,7 @@
 #include "wavfile.h"
 #include <sys/time.h>
 #include <unistd.h>
+#include <algorithm>
 
 void break_on_me(){}
   
@@ -13,6 +14,9 @@ int is_window_open(){
 
 SuperScanner::SuperScanner(int s) : num_nodes(s){
   is_window_open_ = 1;
+  sim_mutex = 0;
+  release_flag = 0;
+  
   controller = Controller();
   controller.activate();
   
@@ -24,6 +28,8 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   for(int i = 0; i < scan_len; i++){
       scan_path[i] = i;
   }
+
+  
   
   //create a linear network
   stiffness_matrix = new float[num_nodes*num_nodes];
@@ -31,8 +37,12 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   memset(stiffness_matrix, 0, sizeof(float)*num_nodes*num_nodes);
   memset(displacement_matrix, 0, sizeof(float)*num_nodes*num_nodes);
   for(int i = 0; i < num_nodes-1; i++){
+    //fill the two diagnols off the main diagnol with 1's for a string.
     stiffness_matrix[(i*num_nodes) + (i+1)] = 1.0;
     displacement_matrix[(i*num_nodes) + (i+1)] = 1.0; //natural displacement of the spring
+
+    stiffness_matrix[((i+1)*num_nodes) + i] = 1.0;
+    displacement_matrix[((i+1)*num_nodes) + i] = 1.0;
   }
   
   constrained_nodes = new int[num_nodes];
@@ -41,10 +51,12 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   constrained_nodes[num_nodes-1] = 1;
   
   node_damping = new float[num_nodes];
-  memset(node_damping, 0.01, sizeof(int)*num_nodes);
-  
   restoring_stiffness = new float[num_nodes];
-  memset(restoring_stiffness, 0.01, sizeof(float)*num_nodes);
+  for(int i = 0; i < num_nodes; i++){
+    node_damping[i] = .01;
+    restoring_stiffness[i] = .01;
+  }
+  
 
   node_pos = new Vector3f[num_nodes];
   node_vel = new Vector3f[num_nodes];
@@ -55,11 +67,19 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
     node_pos[i] = Vector3f(0, i, 0);
     node_vel[i] = Vector3f(0, 0, 0);
   }
+
+  node_eq_pos[num_nodes-1][0] = 2;
+  node_eq_pos[num_nodes-1][2] = 0;
+
+  node_pos[num_nodes-1][0] = 2;
+  node_pos[num_nodes-1][2] = 0;
   
   node_mass = new float[num_nodes];
-  memset(node_mass, 1.0, sizeof(float)*num_nodes);
+  for(int i = 0; i < num_nodes; i++){
+    node_mass[i] = 1;
+  }
   
-  timestep = .001; //randomly chosen.
+  timestep = .001; //randomly chosen. .01 was unstable.
 
   sample_rate = 44100;
   
@@ -84,17 +104,36 @@ SuperScanner::~SuperScanner(){
   delete[] node_acc;
 }
 
+/* cases:
+ * note is > 0 and !release : portamento to note
+ * note is > 0 and release : play note, no portamento
+ * note is -1 and !release : hold same note.
+ * note is -1 and release : Idk how this could hapen.
+ */
 float SuperScanner::tick(int note, float volume){
-  float freq = freqs[(note-21) % 12] * (1 << (1+(int)(note-21)/12));
+  static int was_released = 1;
+  static float p_freq = 0;
   
-  float idx = fmod(freq*k_*scan_len/sample_rate, scan_len);
+  float freq = 0;
+  if(note != -1){
+    freq = freqs[(note-21) % 12] * (1 << (1+(int)(note-21)/12));
+  }
+  
+  if((note != -1) && was_released){p_freq = freq;}
+  else if((note != -1) && !was_released){p_freq += (freq - p_freq)/1000;}
+  
+  //  if((k_ % 10) == 0){
+  //    log_file << freq << "," << p_freq << '\n';
+  //  }
+  
+  float idx = fmod(p_freq*k_*scan_len/sample_rate, scan_len);
   int lower = floorf(idx);
   float diff = idx - lower;
-  float sample = node_pos[lower][2]*(1-diff) + node_pos[lower+1][2]*(diff);
+  float sample = node_pos[scan_path[lower]][2]*(1-diff) + node_pos[scan_path[lower+1]][2]*(diff);
   
   k_++;
+  was_released = release_flag;
   return sample * .005 * volume / 127.0;
-  
 }
 
 void* SuperScanner::simulate_wrapper(void *context){
@@ -104,24 +143,31 @@ void* SuperScanner::simulate_wrapper(void *context){
 
 void SuperScanner::simulate(){
   struct timeval start, end;
-  
-  gettimeofday(&end, NULL);
+
   while(is_window_open_){
+    unsigned int usecs = 100;
     gettimeofday(&start, NULL);
-    
-    ODE(node_acc);
-    for(int i = 0; i < num_nodes; i++){
-      if(constrained_nodes[i])
-	continue;
-      node_pos[i] += node_vel[i]*timestep;
-      node_vel[i] += node_acc[i]*timestep;
+
+    if(!sim_mutex){
+      ODE(node_acc);
+      for(int i = 0; i < num_nodes; i++){
+	if(constrained_nodes[i])
+	  continue;
+	node_pos[i] += node_vel[i]*timestep;
+	node_vel[i] += node_acc[i]*timestep;
+      }
     }
     
+    gettimeofday(&end, NULL);
     //ensures each iteration takes a millisecond.
-    usleep(timestep - (start.tv_usec - end.tv_usec)); //assumes the loop doesn't take more than a millisecond. Which I really hope it doesnt. That would be fucked.
+    unsigned int usec_diff = ((end.tv_sec - start.tv_sec)*1000000) + end.tv_usec - start.tv_usec;
+    unsigned temp = std::min(usec_diff, usecs); //wait at least 1 millisecond.
+    usleep(usecs - temp);
+    
     end = start;
+    
   }
-  
+  printf("Scanner dead\n");
 }
 
 // Xd = ODE(X);
@@ -140,12 +186,18 @@ void SuperScanner::ODE(Vector3f *acc){
   Vector3f eq_dist; //displacement from node eq. position.
   
   //Let N be num_nodes
+  float stiffness_boost = 0;
+  float damping_boost = 0;
+  if(release_flag){
+    stiffness_boost = .1;
+    damping_boost = .1;
+  }
   
   for(int i = 0; i < num_nodes; i++){
     //N restoring forces and damping.
     eq_dist = node_eq_pos[i] - node_pos[i];
-    F_restore = -eq_dist*(.5*restoring_stiffness[i]*eq_dist.norm());
-    F_damping = -node_vel[i]*node_damping[i]; //N damping forces.
+    F_restore = eq_dist*(.5*(stiffness_boost + restoring_stiffness[i])*eq_dist.norm());
+    F_damping = -node_vel[i]*(damping_boost + node_damping[i]); //N damping forces.
 
     //N^2 Stuff.
     F_spring[0] = 0;
@@ -153,39 +205,61 @@ void SuperScanner::ODE(Vector3f *acc){
     F_spring[2] = 0;
     
     for(int j = 0; j < num_nodes; j++){ //I'm hoping that writing it this way will allow the compiler to vectorize easier. Or later I can vectorize it manually.
+      float stiff = stiffness_matrix[(i*num_nodes) + j];
+      if(stiff == 0) continue;
       d_pos[j] = node_pos[j] - node_pos[i];
       d_pos_norm[j] = d_pos[j].norm();
-      diff[j] = d_pos_norm[j] - displacement_matrix[(i*num_nodes) + j];
-      F_spring += d_pos[j]*(.5*stiffness_matrix[(i*num_nodes) + j]*diff[j]*diff[j]/d_pos_norm[j]);
+      diff[j] = d_pos_norm[j];// - displacement_matrix[(i*num_nodes) + j];
+      //If(diff[j] < 0) continue; //cant push rope, as they say
+      F_spring += d_pos[j]*(.5*stiff*diff[j]*diff[j]/d_pos_norm[j]);
     }
 
     F_sum = F_spring + F_restore + F_damping;
     for(int j = 0; j < 3; j++){
-      acc[i][j] = node_mass[i] / F_sum[j]; //  A = F/m //TODO
+      acc[i][j] = F_sum[j] / node_mass[i]; //  A = F/m //TODO
     }
   }
 }
 
-
+void SuperScanner::release(){
+  release_flag = 1;
+}
 
 void SuperScanner::strike(){
+  k_= 0;
+  release_flag = 0;
   sim_mutex = 1;
   for(int i = 0; i < scan_len; i++){
     int n = scan_path[i];
+    if(constrained_nodes[n]) continue; //hammer doesnt affect constrained nodes.    
     node_pos[n][0] = node_eq_pos[n][0];
     node_pos[n][1] = node_eq_pos[n][1];
-    node_pos[n][2] = hammer_table[n];
+    node_pos[n][2] = hammer_table[i];
+  }
+  for(int i = 0; i < num_nodes; i++){
+    node_vel[i][0] = 0;
+    node_vel[i][1] = 0;
+    node_vel[i][2] = 0;
+
+    node_acc[i][0] = 0;
+    node_acc[i][1] = 0;
+    node_acc[i][2] = 0;
   }
   sim_mutex = 0;
 }
 
 int SuperScanner::start(){
+  log_file.open("log_file.csv");
+  log_file << "U,Y\n";
+  
   is_window_open_ = 1;
   pthread_create(&scan_thread, NULL, &(simulate_wrapper), (void*)this);
   return 0;
 }
 
 int SuperScanner::stop(){
+  log_file.close();
+  
   is_window_open_ = 0;
   pthread_join(scan_thread, 0);
   return 0;
@@ -200,12 +274,12 @@ void SuperScanner::setHammer(int num){
     hammer_num = num;
     if(hammer_num == 0){ //special case.
         for(int i = 0; i < scan_len; i++){
-            hammer_table[i] = 5*sinf(M_PI*(i+1)/(scan_len+2));
+	    hammer_table[i] = 5*sinf(M_PI*i/(scan_len-1));
         }
     }
     else if(hammer_num == 101){ //another special case I felt was worth including.
-        for(int i = 0; i < scan_len; i++){
-            hammer_table[i] = 5*fabs(((scan_len+2) / 2.0) - (i+1)) / ((scan_len+2)/2);
+        for(int i = 1; i < scan_len-1; i++){
+            hammer_table[i] = 5*fabs(((scan_len-1) / 2.0) - i) / ((scan_len-1)/2);
         }
     }
     else{ //load the file from AKWF.

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <iostream>
+#include <fstream>
+
 #include "controller.h"
 #ifdef Success //this is stupid
   #undef Success
@@ -18,6 +21,7 @@ public:
   SuperScanner(int s);
   ~SuperScanner();
   
+  void release();
   void strike();
   float tick(int note, float volume);
   
@@ -47,7 +51,10 @@ private:
   Controller controller;
   
   pthread_t scan_thread;
+
+  std::ofstream log_file;
   
+  volatile int release_flag;
   int scan_len; //size of the table getting scanned
   int hammer_num;
   float timestep;

@@ -16,13 +16,53 @@ SuperScanner Todo List
   Need to have a way to switch from stereoscopic to 
   regular visualization.
 
-
-* TODO Test Simple Wave Scanner
+* DONE Test Simple Wave Scanner
   In-Progress. No working. Scanner apparently has numerous bugs that I will have to
   work through.
+  Bugs worked through. Sound being produced.
 
+* DONE Damping to simulate Release
+  A function that does the opposite of strike()
+  It will increase the damping and centering force so that
+  the scanner goes to zero. Also need to fix a bug in the audio_engine.
 
+* DONE Add Slew Limiter to tick() function
+  Create portamento between notes.
+  Made it, but its fucked and idk why.
+  I plotted the step response of the slew limiter
+  and it is working as intended. Idk why it is making
+  a pew sound. It was because I forgot to set k_ = 0.
+  Interesting. Idk why an incorrect phase could produce
+  that issue.
+
+* TODO Audio Engine bug
+  Every like 1/100 strikes gives a weird sound. Might try without -O3.
+  Removing O3 got rid of the bug. But also, evaluation was slow as shit.
+  Could compile different files with O3 to isolate bug. I think its caused
+  by compiling audio_engine with O3. I put the O3 flag on super_scanner.cpp
+  only but the problem remains. Idk lol. The problem could be related to
+  threading and race conditions. Ignoring for now.
+  
   
 
 
+
+* TODO Gui Features
+  Will implement with text boxes.
+  Controller will be used for making batch changes.
+** TODO Change Scan Path Menu
+   What is needed?
+   A text box for each index in the scan path.
+   Perhaps a top down view of the network with nodes labelled?
+** TODO Change Node Mass
+** TODO Change Connection Matrix
+** TODO Change EQ Position
+** TODO Select Hammer Table
+* DONE Rotate Viewer
+  Easy.
+* TODO Visualize Scan Path
+
+
+Hard:
+* TODO Adaptive Sampling and Anti-Aliasing
 

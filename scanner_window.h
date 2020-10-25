@@ -23,6 +23,12 @@
 #define STEREO_DISPARITY .068 //milimeters.
 #define EPS 1e-7
 
+
+#define SCANNER_3D_MENU 0
+#define SCAN_PATH_MENU 1
+
+
+
 using namespace Eigen;
 
 typedef struct {
@@ -55,10 +61,18 @@ void del_window();
 void* window_thread(void*);
 
 
+void draw_scanner(Display *dpy, Window w, GC gc);
+void handle_scanner_events(Display *dpy, Window w, GC gc);
+
+void draw_scan_path_menu(Display *dpy, Window w, GC gc);
+void handle_scan_path_events(Display *dpy, Window w, GC gc);
+
+
 int rainbow(int c);
 Matrix3f get_rotation(float x, float y, float z);
 ProjectedPoints project_point(Vector3f point_v, Vector3f view_v);
 StereoPixels projection_to_pixels(ProjectedPoints pp);
+
 void draw_stereo_line(Vector3f start_point, Vector3f end_point);
 void draw_stereo_point(Vector3f point);
 void draw_stereo_sphere(Sphere sphere);

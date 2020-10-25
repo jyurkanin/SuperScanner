@@ -5,7 +5,7 @@ all: main.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engi
 	g++ -o scan main.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engine.o  $(CFLAGS) $(LIBS)
 
 super_scanner.o: super_scanner.cpp
-	g++ -c super_scanner.cpp  $(CFLAGS) $(LIBS)
+	g++ -c super_scanner.cpp  -O3 $(CFLAGS) $(LIBS)
 
 controller.o: controller.cpp
 	g++ -c controller.cpp  $(CFLAGS) $(LIBS)

@@ -47,6 +47,7 @@ void *audio_thread(void *arg){
       
       frames_to_deliver = frames_to_deliver > 441 ? 441 : frames_to_deliver;
       memset(sum_frames, 0, 441*sizeof(float));
+      //memset(stereo_frames, 0, 882*sizeof(float));
       
       
       
@@ -60,22 +61,24 @@ void *audio_thread(void *arg){
 	  last_note = curr_note;
 	  curr_note = k;
 	}
-	else if(midiNotesReleased[k]){
+      }
+      for(int k = 21; k <= 108; k++){
+	if(midiNotesReleased[k]){
 	  midiNotesReleased[k] = 0; //lets just pray we dont have race conditions.
-	  if(k == curr_note){
+	  if(k == curr_note){ //activate note release.
+	    scanner->release();
 	    curr_note = -1;
 	    last_note = -1;
 	  }
 	}
       }
 
-      if(curr_note != -1){
-	for(int j = 0; j < frames_to_deliver; j++){
-	  sum_frames[j] = scanner->tick(curr_note, volume);
-	  stereo_frames[2*j] = sum_frames[j];
-	  stereo_frames[2*j + 1] = sum_frames[j];
-	}
+      for(int j = 0; j < frames_to_deliver; j++){
+	sum_frames[j] = scanner->tick(curr_note, volume);
+	stereo_frames[2*j] = sum_frames[j];
+	stereo_frames[2*j + 1] = sum_frames[j];
       }
+
       
       /*
       if(main_controller.get_button(2)){
