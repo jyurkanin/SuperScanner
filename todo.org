@@ -46,14 +46,18 @@ SuperScanner Todo List
   
 
 
-
+* DONE Mono Visualization
+  Easy
 * TODO Gui Features
   Will implement with text boxes.
   Controller will be used for making batch changes.
 ** TODO Change Scan Path Menu
    What is needed?
-   A text box for each index in the scan path.
-   Perhaps a top down view of the network with nodes labelled?
+   A text box for each index in the scan path. Forget it.
+   You were thinking about clicking on shit and typing in values.
+   Maybe we can keep typing, but nix clicking. Just use arrow keys
+   to scroll.
+   Perhaps a top down view of the network with nodes labelled? Done.
 ** TODO Change Node Mass
 ** TODO Change Connection Matrix
 ** TODO Change EQ Position

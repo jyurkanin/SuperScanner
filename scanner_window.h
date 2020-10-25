@@ -1,5 +1,6 @@
 #pragma once
 
+#include <X11/keysymdef.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
@@ -28,30 +29,37 @@
 #define SCAN_PATH_MENU 1
 
 
-
 using namespace Eigen;
 
 typedef struct {
-    float theta_l, theta_r, phi_l, phi_r;
-} ProjectedPoints;
+  float theta_l, theta_r, phi_l, phi_r;
+} ProjectedStereoPoints;
+
+typedef struct {
+  float theta, phi;
+} ProjectedPoint;
 
 typedef struct{
-    int xl, yl, xr, yr;
+  int xl, yl, xr, yr;
 } StereoPixels;
 
 typedef struct{
-    float x, y, z;
+  int x, y;
+} MonoPixel;
+
+typedef struct{
+  float x, y, z;
 } Point3D;
 
 typedef struct{
-    Vector3f pos;
-    float radius;
+  Vector3f pos;
+  float radius;
 } Sphere;
 
 typedef struct{
-    Vector3f pos;
-    Matrix3f rot;
-    Vector3f vertices;
+  Vector3f pos;
+  Matrix3f rot;
+  Vector3f vertices;
 } RigidBody;
 
 
@@ -62,23 +70,35 @@ void* window_thread(void*);
 
 
 void draw_scanner(Display *dpy, Window w, GC gc);
-void handle_scanner_events(Display *dpy, Window w, GC gc);
-
-void draw_scan_path_menu(Display *dpy, Window w, GC gc);
-void handle_scan_path_events(Display *dpy, Window w, GC gc);
+void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono);
+  
+void draw_scan_path_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
+void draw_node_labels(Vector3f *node_pos, int num_nodes);
 
 
 int rainbow(int c);
 Matrix3f get_rotation(float x, float y, float z);
-ProjectedPoints project_point(Vector3f point_v, Vector3f view_v);
-StereoPixels projection_to_pixels(ProjectedPoints pp);
 
+ProjectedStereoPoints project_stereo_point(Vector3f point_v, Vector3f view_v);
+StereoPixels projection_to_stereo_pixels(ProjectedStereoPoints pp);
 void draw_stereo_line(Vector3f start_point, Vector3f end_point);
 void draw_stereo_point(Vector3f point);
 void draw_stereo_sphere(Sphere sphere);
-
 void draw_stereo_lines(Vector3f *start_point, Vector3f *end_point, int len);
 void draw_stereo_points(Vector3f *point, int len);
+
+
+ProjectedPoint project_mono_point(Vector3f point_v, Vector3f view_v);
+MonoPixel projection_to_mono_pixel(ProjectedPoint pp);
+//void draw_mono_line(Vector3f start_point, Vector3f end_point);
+//void draw_mono_point(Vector3f point);
+//void draw_mono_sphere(Sphere sphere);
+void draw_mono_lines(Vector3f *start_point, Vector3f *end_point, int len);
+void draw_mono_points(Vector3f *point, int len);
+
+
+
+
 
 
 void runge_kutta(float *X, float *Xt1, void (ode)(float*,float*), float ts, int len);
