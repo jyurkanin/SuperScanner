@@ -19,6 +19,13 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   
   controller = Controller();
   controller.activate();
+
+  release_damping = .1;
+  release_stiffness = 1;
+
+  mass_bias = 0;
+  damping_bias = 0;
+  stiffness_bias = 0;
   
   scan_len = num_nodes; //create a linear network
   hammer_num = 0;
@@ -50,11 +57,10 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   constrained_nodes[0] = 1;
   constrained_nodes[num_nodes-1] = 1;
   
-  node_damping = new float[num_nodes];
-  restoring_stiffness = new float[num_nodes];
+  node_damping = new int[num_nodes];
+  restoring_stiffness = .01;
   for(int i = 0; i < num_nodes; i++){
-    node_damping[i] = .01;
-    restoring_stiffness[i] = .01;
+    node_damping[i] = 1;
   }
   
 
@@ -74,7 +80,7 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   node_pos[num_nodes-1][0] = 2;
   node_pos[num_nodes-1][2] = 0;
   
-  node_mass = new float[num_nodes];
+  node_mass = new int[num_nodes];
   for(int i = 0; i < num_nodes; i++){
     node_mass[i] = 1;
   }
@@ -96,7 +102,6 @@ SuperScanner::~SuperScanner(){
   delete[] stiffness_matrix;
   delete[] displacement_matrix;
   delete[] constrained_nodes;
-  delete[] restoring_stiffness;
   delete[] node_damping;
   delete[] node_mass;
   delete[] node_pos;
@@ -133,7 +138,7 @@ float SuperScanner::tick(int note, float volume){
   
   k_++;
   was_released = release_flag;
-  return sample * .005 * volume / 127.0;
+  return sample * .005 * m_volume * volume / 127.0;
 }
 
 void* SuperScanner::simulate_wrapper(void *context){
@@ -186,18 +191,18 @@ void SuperScanner::ODE(Vector3f *acc){
   Vector3f eq_dist; //displacement from node eq. position.
   
   //Let N be num_nodes
-  float stiffness_boost = 0;
-  float damping_boost = 0;
+  float stiffness_boost = stiffness_bias;
+  float damping_boost = damping_bias;
   if(release_flag){
-    stiffness_boost = .1;
-    damping_boost = .1;
+    stiffness_boost = release_stiffness;
+    damping_boost = release_damping;
   }
   
   for(int i = 0; i < num_nodes; i++){
     //N restoring forces and damping.
     eq_dist = node_eq_pos[i] - node_pos[i];
-    F_restore = eq_dist*(.5*(stiffness_boost + restoring_stiffness[i])*eq_dist.norm());
-    F_damping = -node_vel[i]*(damping_boost + node_damping[i]); //N damping forces.
+    F_restore = eq_dist*(.5*(stiffness_boost + restoring_stiffness)*eq_dist.norm());
+    F_damping = -node_vel[i]*(damping_boost + (node_damping[i]/100.0)); //N damping forces.
 
     //N^2 Stuff.
     F_spring[0] = 0;
@@ -216,7 +221,7 @@ void SuperScanner::ODE(Vector3f *acc){
 
     F_sum = F_spring + F_restore + F_damping;
     for(int j = 0; j < 3; j++){
-      acc[i][j] = F_sum[j] / node_mass[i]; //  A = F/m //TODO
+      acc[i][j] = F_sum[j] / (mass_bias + (node_mass[i]/10.0)); //  A = F/m //TODO
     }
   }
 }
@@ -258,6 +263,7 @@ int SuperScanner::start(){
 }
 
 int SuperScanner::stop(){
+  printf("Super scanner says good bye bye\n");
   log_file.close();
   
   is_window_open_ = 0;
@@ -314,7 +320,15 @@ void SuperScanner::setHammer(int num){
 
 void SuperScanner::update_params(){
   if(controller.has_new_data()){
-    m_volume = controller.get_slider(0);
+    m_volume = 1;//controller.get_slider(0)/127.0;
+    restoring_stiffness = controller.get_slider(1);
+    setHammer(controller.get_slider(2));
+    release_stiffness = controller.get_slider(3)/127.0;
+    release_damping = controller.get_slider(4)/127.0;
+
+    mass_bias = controller.get_slider(5);
+    damping_bias = controller.get_slider(6);
+    stiffness_bias = controller.get_slider(7);
   }
 }
 

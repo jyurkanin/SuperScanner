@@ -42,6 +42,10 @@ public:
   Vector3f *node_pos;
   float *stiffness_matrix; //Oh boyo. Upper triangular. to avoid repetition.
   int sim_mutex;
+  int scan_len; //size of the table getting scanned
+  int *scan_path;
+  int *node_damping;
+  int *node_mass;
 private:
   static void* simulate_wrapper(void*);
   void simulate();
@@ -55,22 +59,22 @@ private:
   std::ofstream log_file;
   
   volatile int release_flag;
-  int scan_len; //size of the table getting scanned
   int hammer_num;
   float timestep;
   float sample_rate;
   float m_volume;
+  float release_stiffness;
+  float release_damping;
+  float mass_bias;
+  float damping_bias;
+  float stiffness_bias;
   
   uint32_t k_;
-  
-  int *scan_path;
   float *hammer_table;
   float *displacement_matrix; //Also upper triangular. Represents the equillibrium length of the spring connecting two nodes.
   int *constrained_nodes;
   Vector3f *node_eq_pos;
-  float *restoring_stiffness;
-  float *node_damping;
-  float *node_mass;
+  float restoring_stiffness;
 
 
   Vector3f *node_vel;

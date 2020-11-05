@@ -1,7 +1,8 @@
 #include "scanner_window.h"
 #include "super_scanner.h"
 #include <algorithm>
-
+#include <ctype.h>
+#include <string.h>
 
 Display *dpy;
 Window w;
@@ -13,6 +14,176 @@ void breakerbreaker(){}
 
 Vector3f origin = {-3,8,0};
 float viewer_angle = -.1;
+
+
+
+
+int get_num(){ //read the keyboard for a number
+    XEvent e;
+    KeySym ks = 0;
+    char buf[2] = {0,0};
+    char number[128];
+    int count = 0;
+    int ret = 0;
+    do{
+        if(XPending(dpy) > 0){
+            XNextEvent(dpy, &e);
+            if(e.type == KeyPress){
+                XLookupString(&e.xkey, buf, 1, &ks, NULL);
+                if(isdigit(buf[0])){
+		  number[count] = buf[0];
+		  count++;
+		}
+            }
+        }
+    } while(ks != 0xFF0D);
+    number[count] = 0;
+    sscanf(number, "%d", &ret);
+    return ret;
+}
+
+
+void draw_connectivity_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_sel_y){
+  //Draw Upper Triangular Grid.
+  int offset_x = 20;
+  int offset_y = 20;
+  float interval_x = (SCREEN_WIDTH-(offset_x*2))/((float)scanner->num_nodes);
+  float interval_y = (SCREEN_HEIGHT-(offset_y*2))/((float)scanner->num_nodes);
+  
+  XSegment grid_segs[(scanner->num_nodes + 1) * 2];
+
+  breakerbreaker();
+  //rows. First row doesnt follow pattern.
+  grid_segs[0].x1 = offset_x;
+  grid_segs[0].y1 = offset_y;
+  grid_segs[0].x2 = SCREEN_WIDTH-offset_x;
+  grid_segs[0].y2 = offset_y;
+  
+  for(int i = 1; i < (scanner->num_nodes + 1); i++){
+    grid_segs[i].x1 = offset_x + (i-1)*interval_x;
+    grid_segs[i].y1 = offset_y + i*interval_y;
+    grid_segs[i].x2 = SCREEN_WIDTH - offset_x;
+    grid_segs[i].y2 = offset_y + i*interval_y;
+  }
+
+  int offset_temp = scanner->num_nodes + 1;
+  //cols.
+  for(int i = 0; i < scanner->num_nodes; i++){
+    grid_segs[i+offset_temp].x1 = offset_x + i*interval_x;
+    grid_segs[i+offset_temp].y1 = offset_y;
+    grid_segs[i+offset_temp].x2 = offset_x + i*interval_x;
+    grid_segs[i+offset_temp].y2 = offset_y + (i+1)*interval_y;
+  }
+  //last column is different
+  offset_temp = offset_temp + scanner->num_nodes;
+  grid_segs[offset_temp].x1 = offset_x + (scanner->num_nodes)*interval_x;
+  grid_segs[offset_temp].y1 = offset_y;
+  grid_segs[offset_temp].x2 = offset_x + (scanner->num_nodes)*interval_x;
+  grid_segs[offset_temp].y2 = offset_y + (scanner->num_nodes)*interval_y;
+
+  XSetForeground(dpy, gc, 0xFF00);
+  XDrawSegments(dpy, w, gc, grid_segs, offset_temp+1);
+
+
+  int num_len = 10;
+  char number[10];
+  //display the stiffness values.
+  for(int i = 0; i < scanner->num_nodes; i++){
+    for(int j = i; j < scanner->num_nodes; j++){
+      sprintf(number, "%.3f", scanner->stiffness_matrix[(i*scanner->num_nodes)+j]);
+      num_len = strlen(number);
+      XDrawString(dpy, w, gc, offset_x-16 + interval_x*(.5+j), offset_y + 8+ interval_y*(.5+i), number, num_len);
+    }
+  }
+
+
+  
+  XSegment sel_segments[4];
+  
+  sel_segments[0].x1 = offset_x + (interval_x*node_sel_x);
+  sel_segments[0].y1 = offset_y + (interval_y*node_sel_y);
+  sel_segments[0].x2 = offset_x + (interval_x*(node_sel_x+1));
+  sel_segments[0].y2 = offset_y + (interval_y*node_sel_y);
+
+  sel_segments[1].x1 = offset_x + (interval_x*(node_sel_x+1));
+  sel_segments[1].y1 = offset_y + (interval_y*(node_sel_y));
+  sel_segments[1].x2 = offset_x + (interval_x*(node_sel_x+1));
+  sel_segments[1].y2 = offset_y + (interval_y*(node_sel_y+1));
+
+  sel_segments[2].x1 = offset_x + (interval_x*(node_sel_x+1));
+  sel_segments[2].y1 = offset_y + (interval_y*(node_sel_y+1));
+  sel_segments[2].x2 = offset_x + (interval_x*(node_sel_x));
+  sel_segments[2].y2 = offset_y + (interval_y*(node_sel_y+1));
+
+  sel_segments[3].x1 = offset_x + (interval_x*(node_sel_x));
+  sel_segments[3].y1 = offset_y + (interval_y*(node_sel_y+1));
+  sel_segments[3].x2 = offset_x + (interval_x*(node_sel_x));
+  sel_segments[3].y2 = offset_y + (interval_y*(node_sel_y));
+  
+  
+  XSetForeground(dpy, gc, 0xFF0000);
+  XDrawSegments(dpy, w, gc, sel_segments, 4);
+}
+
+
+void handle_connectivity_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel_x, int &node_sel_y){
+  XEvent e;
+  KeySym ks = 0;
+  char buf[2];
+  static char number[128];
+  static int count = 0;
+  float parsed_num = 0;
+  float max_value = 20; //random.
+  
+  
+  if(XPending(dpy) > 0){
+    XNextEvent(dpy, &e);
+    if(e.type == KeyPress){
+      XLookupString(&e.xkey, buf, 1, &ks, NULL);
+
+      if(isdigit(buf[0]) || (buf[0] == '.')){
+	number[count] = buf[0];
+	count++;
+      }
+      if(ks == 0xFF0D){
+	number[count] = 0;
+	sscanf(number, "%f", &parsed_num);
+	if(parsed_num < max_value){
+	  scanner->stiffness_matrix[(node_sel_y*scanner->num_nodes) + node_sel_x] = parsed_num; //have to get the index at the opposite side of the diagonal too.
+	  scanner->stiffness_matrix[(node_sel_x*scanner->num_nodes) + node_sel_y] = parsed_num; //maintain symmetric constrain
+	}
+	count = 0;
+      }
+      
+      switch(buf[0]){
+      case 'x':
+	scanner->sim_mutex = 0;
+	menu_id = SCANNER_3D_MENU;
+	break;
+      }
+      switch(XLookupKeysym(&e.xkey, 0)){
+      case XK_Left:
+	node_sel_x = std::max(node_sel_y+1, node_sel_x-1); //I like this function.
+	count = 0;
+	break;
+      case XK_Right:
+	node_sel_x = std::min(scanner->num_nodes-1, node_sel_x+1); //me gusta
+	count = 0;
+	break;
+      case XK_Down:
+	node_sel_y = std::min(node_sel_x-1, node_sel_y+1); //me gusta
+	count = 0;
+	break;
+      case XK_Up:
+	node_sel_y = std::max(0, node_sel_y-1); //I like this function.
+	count = 0;
+	break;
+      }
+    }
+  }  
+}
+
+
 
 
 //draw all connections.
@@ -63,6 +234,18 @@ void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono)
 	scanner->sim_mutex = 1;
 	menu_id = SCAN_PATH_MENU;
 	break;
+      case 'n':
+	scanner->sim_mutex = 1;
+	menu_id = NODE_MASS_MENU;
+	break;
+      case 'd':
+	scanner->sim_mutex = 1;
+	menu_id = NODE_DAMPING_MENU;
+	break;
+      case 'c':
+	scanner->sim_mutex = 1;
+	menu_id = CONNECTIVITY_MENU;
+	break;
       case 'p':
 	scanner->sim_mutex = 1;
 	break;
@@ -78,9 +261,19 @@ void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono)
   }
 }
 
-
-
+void draw_node_damping_menu(Display *dpy, Window w, GC gc, int node_sel){
+  XDrawString(dpy, w, gc, SCREEN_WIDTH/2, 20, "Node Damping Menu", 17);
+  draw_scanner_node_menu(dpy, w, gc, node_sel, scanner->node_damping);
+}
 void draw_scan_path_menu(Display *dpy, Window w, GC gc, int node_sel){
+  XDrawString(dpy, w, gc, SCREEN_WIDTH/2, 20, "Scanner Path Menu", 17);
+  draw_scanner_node_menu(dpy, w, gc, node_sel, scanner->scan_path);
+}
+void draw_node_mass_menu(Display *dpy, Window w, GC gc, int node_sel){
+  XDrawString(dpy, w, gc, SCREEN_WIDTH/2, 20, "Node Mass Menu", 14);
+  draw_scanner_node_menu(dpy, w, gc, node_sel, scanner->node_mass);
+}
+void draw_scanner_node_menu(Display *dpy, Window w, GC gc, int node_sel, int *params){
   //Draw 1/2 size mono scanner. Label Nodes.
   int actual_len = 0;
   int num_nodes = scanner->num_nodes;
@@ -103,10 +296,41 @@ void draw_scan_path_menu(Display *dpy, Window w, GC gc, int node_sel){
   
   draw_mono_lines(start, end, actual_len);
   draw_node_labels(node_pos_rot, num_nodes);
-  
-  
+
+  draw_text_boxes(params);
+  draw_select_box(node_sel);
+}
+
+void draw_select_box(int node_sel){
+  XSegment sel_segments[4];
+  float interval = (SCREEN_WIDTH-40.0)/scanner->scan_len;
+  sel_segments[0].x1 = 20 + (interval*node_sel);
+  sel_segments[0].y1 = SCREEN_HEIGHT - 20;
+  sel_segments[0].x2 = 20 + (interval*node_sel);
+  sel_segments[0].y2 = SCREEN_HEIGHT - 40;
+
+  sel_segments[1].x1 = 20 + (interval*(node_sel+1));
+  sel_segments[1].y1 = SCREEN_HEIGHT - 20;
+  sel_segments[1].x2 = 20 + (interval*(node_sel+1));
+  sel_segments[1].y2 = SCREEN_HEIGHT - 40;
+
+  sel_segments[2].x1 = 20 + (interval*(node_sel+1));
+  sel_segments[2].y1 = SCREEN_HEIGHT - 20;
+  sel_segments[2].x2 = 20 + (interval*node_sel);
+  sel_segments[2].y2 = SCREEN_HEIGHT - 20;
+
+  sel_segments[3].x1 = 20 + (interval*(node_sel+1));
+  sel_segments[3].y1 = SCREEN_HEIGHT - 40;
+  sel_segments[3].x2 = 20 + (interval*node_sel);
+  sel_segments[3].y2 = SCREEN_HEIGHT - 40;
+
+  XSetForeground(dpy, gc, 0xFF0000);  
+  XDrawSegments(dpy, w, gc, sel_segments, 4);
+}
+
+void draw_text_boxes(int * params){
   //Draw Scan Path
-  int num_segs = 4 + scanner->num_nodes - 1;
+  int num_segs = 4 + scanner->scan_len - 1;
   XSegment segments[num_segs];
   
   //Left segment
@@ -134,58 +358,87 @@ void draw_scan_path_menu(Display *dpy, Window w, GC gc, int node_sel){
   segments[3].y2 = SCREEN_HEIGHT-20;
   
   
-  float interval = (SCREEN_WIDTH-40.0)/(scanner->num_nodes-1);
-  for(int i = 1; i < scanner->num_nodes-1; i++){
-    segments[4+i].x1 = 20 + (interval*i);
+  int num;
+  char snum[4];
+  int num_len;
+  float interval = (SCREEN_WIDTH-40.0)/scanner->scan_len;
+  for(int i = 0; i < scanner->scan_len; i++){
+    segments[4+i].x1 = 20 + (interval*(1+i));
     segments[4+i].y1 = SCREEN_HEIGHT - 20;
-    segments[4+i].x2 = 20 + (interval*i);
+    segments[4+i].x2 = 20 + (interval*(1+i));
     segments[4+i].y2 = SCREEN_HEIGHT - 40;
-  }
-
-  XSegment sel_segments[4];
-  sel_segments[0].x1 = 20 + (interval*node_sel);
-  sel_segments[0].y1 = SCREEN_HEIGHT - 20;
-  sel_segments[0].x2 = 20 + (interval*node_sel);
-  sel_segments[0].y2 = SCREEN_HEIGHT - 40;
-
-  sel_segments[1].x1 = 20 + (interval*(node_sel+1));
-  sel_segments[1].y1 = SCREEN_HEIGHT - 20;
-  sel_segments[1].x2 = 20 + (interval*(node_sel+1));
-  sel_segments[1].y2 = SCREEN_HEIGHT - 40;
-
-  sel_segments[2].x1 = 20 + (interval*(node_sel+1));
-  sel_segments[2].y1 = SCREEN_HEIGHT - 20;
-  sel_segments[2].x2 = 20 + (interval*(node_sel+1));
-  sel_segments[2].y2 = SCREEN_HEIGHT - 40;
-  
+    
+    num = params[i];
+    sprintf(snum, "%d", num);
+    if(num < 10)
+      num_len = 1;
+    else if(num < 100)
+      num_len = 2;
+    else if(num < 1000)
+      num_len = 3;
+    
+    XDrawString(dpy, w, gc, 22 + (interval*i), SCREEN_HEIGHT-22, snum, num_len);
+  }  
   
   XDrawSegments(dpy, w, gc, segments, num_segs);
-  
-  XSetForeground(dpy, gc, 0xFF0000);  
-  XDrawSegments(dpy, w, gc, sel_segments, 4);
 }
 
 
+void handle_node_damping_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel){
+  handle_scanner_node_menu(dpy, w, gc, menu_id, node_sel, scanner->node_damping, 100);
+}
+void handle_node_mass_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel){
+  handle_scanner_node_menu(dpy, w, gc, menu_id, node_sel, scanner->node_mass, 10);
+}
 void handle_scan_path_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel){
+  handle_scanner_node_menu(dpy, w, gc, menu_id, node_sel, scanner->scan_path, scanner->scan_len);
+}
+void handle_scanner_node_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel, int *params, int max_value){
   XEvent e;
+  KeySym ks = 0;
   char buf[2];
-
+  static char number[128];
+  static int count = 0;
+  int parsed_num = 0;
+  
   if(XPending(dpy) > 0){
     XNextEvent(dpy, &e);
     if(e.type == KeyPress){
-      XLookupString(&e.xkey, buf, 1, NULL, NULL);
+      XLookupString(&e.xkey, buf, 1, &ks, NULL);
+
+      if(isdigit(buf[0])){
+	number[count] = buf[0];
+	count++;
+      }
+      if(ks == 0xFF0D){
+	number[count] = 0;
+	sscanf(number, "%d", &parsed_num);
+	if(parsed_num < max_value){
+	  params[node_sel] = parsed_num;
+	}
+	count = 0;
+      }
+      
       switch(buf[0]){
       case 'x':
 	scanner->sim_mutex = 0;
 	menu_id = SCANNER_3D_MENU;
 	break;
       }
-      switch(e.xkey.keycode){
+      switch(XLookupKeysym(&e.xkey, 0)){
       case XK_Left:
-	node_sel = std::min(0, node_sel-1); //I like this function.
+	node_sel = std::max(0, node_sel); //I like this function.
+	count = 0;
 	break;
       case XK_Right:
-	node_sel = std::max(scanner->num_nodes-1, node_sel+1); //me gusta
+	node_sel = std::min(scanner->num_nodes-1, node_sel+1); //me gusta
+	count = 0;
+	break;
+      case XK_Up:
+	params[node_sel] = std::min(params[node_sel]+1, scanner->num_nodes);
+	break;
+      case XK_Down:
+	params[node_sel] = std::max(params[node_sel]-1, 0);
 	break;
       }
     }
@@ -193,10 +446,14 @@ void handle_scan_path_menu(Display *dpy, Window w, GC gc, int &menu_id, int &nod
 }
 
 
+
 void* window_thread(void*){
   int menu_id = SCANNER_3D_MENU;
   int mono = 1;
   int node_sel = 0;
+
+  int node_sel_x = 0; //Connectivity matrix
+  int node_sel_y = 0;
   
   XSetBackground(dpy, gc, 0);
   while(is_window_open()){
@@ -205,13 +462,22 @@ void* window_thread(void*){
     case SCANNER_3D_MENU: //Main Menu Section=============================================
       draw_scanner(dpy, w, gc, mono);
       handle_scanner_menu(dpy, w, gc, menu_id, mono);      
-
       break;
-      
     case SCAN_PATH_MENU: //Scan Path Selection Menu=================================
       draw_scan_path_menu(dpy, w, gc, node_sel);
       handle_scan_path_menu(dpy, w, gc, menu_id, node_sel);
-      
+      break;
+    case NODE_MASS_MENU: //Node Mass Menu=================================
+      draw_node_mass_menu(dpy, w, gc, node_sel);
+      handle_node_mass_menu(dpy, w, gc, menu_id, node_sel);
+      break;
+    case NODE_DAMPING_MENU: //Node Mass Menu=================================
+      draw_node_damping_menu(dpy, w, gc, node_sel);
+      handle_node_damping_menu(dpy, w, gc, menu_id, node_sel);
+      break;
+    case CONNECTIVITY_MENU: //Connection Matrix Menu=================================
+      draw_connectivity_menu(dpy, w, gc, node_sel_x, node_sel_y);
+      handle_connectivity_menu(dpy, w, gc, menu_id, node_sel_x, node_sel_y);
       break;
      
     default: //Never get here. Pls.

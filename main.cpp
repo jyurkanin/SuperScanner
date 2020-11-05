@@ -18,7 +18,7 @@ int main(int argc, char *argv[]){
   while(is_window_open()){
     usleep(1000); //to prevent is_window_open from burning cycles.
   }
-  scanner.stop();
+  //scanner.stop();
   del_window();
   
   del_audio();

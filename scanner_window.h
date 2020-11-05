@@ -27,7 +27,9 @@
 
 #define SCANNER_3D_MENU 0
 #define SCAN_PATH_MENU 1
-
+#define NODE_MASS_MENU 2
+#define NODE_DAMPING_MENU 3
+#define CONNECTIVITY_MENU 4
 
 using namespace Eigen;
 
@@ -71,13 +73,26 @@ void* window_thread(void*);
 
 void draw_scanner(Display *dpy, Window w, GC gc);
 void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono);
-  
-void draw_scan_path_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
-void draw_node_labels(Vector3f *node_pos, int num_nodes);
 
+void handle_connectivity_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel_x, int &node_sel_y);
+void handle_node_mass_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
+void handle_scan_path_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
+void handle_node_damping_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
+void handle_scanner_node_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel, int *params, int max);
+
+void draw_connectivity_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_sel_y);
+void draw_scan_path_menu(Display *dpy, Window w, GC gc, int node_sel);
+void draw_node_mass_menu(Display *dpy, Window w, GC gc, int node_sel);
+void draw_node_damping_menu(Display *dpy, Window w, GC gc, int node_sel);
+void draw_scanner_node_menu(Display *dpy, Window w, GC gc, int node_sel, int *params);
+
+void draw_node_labels(Vector3f *node_pos, int num_nodes);
+void draw_text_boxes(int * params);
+void draw_select_box(int node_sel);
 
 int rainbow(int c);
 Matrix3f get_rotation(float x, float y, float z);
+int get_num();
 
 ProjectedStereoPoints project_stereo_point(Vector3f point_v, Vector3f view_v);
 StereoPixels projection_to_stereo_pixels(ProjectedStereoPoints pp);
@@ -95,10 +110,6 @@ MonoPixel projection_to_mono_pixel(ProjectedPoint pp);
 //void draw_mono_sphere(Sphere sphere);
 void draw_mono_lines(Vector3f *start_point, Vector3f *end_point, int len);
 void draw_mono_points(Vector3f *point, int len);
-
-
-
-
 
 
 void runge_kutta(float *X, float *Xt1, void (ode)(float*,float*), float ts, int len);

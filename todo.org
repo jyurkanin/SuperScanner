@@ -35,38 +35,55 @@ SuperScanner Todo List
   Interesting. Idk why an incorrect phase could produce
   that issue.
 
-* TODO Audio Engine bug
+* DONE Audio Engine bug
   Every like 1/100 strikes gives a weird sound. Might try without -O3.
   Removing O3 got rid of the bug. But also, evaluation was slow as shit.
   Could compile different files with O3 to isolate bug. I think its caused
   by compiling audio_engine with O3. I put the O3 flag on super_scanner.cpp
   only but the problem remains. Idk lol. The problem could be related to
   threading and race conditions. Ignoring for now.
+  It was an issue with setting positions to 0 during strike().
   
-  
-
 
 * DONE Mono Visualization
   Easy
 * TODO Gui Features
   Will implement with text boxes.
   Controller will be used for making batch changes.
-** TODO Change Scan Path Menu
+** DONE Change Scan Path Menu
    What is needed?
    A text box for each index in the scan path. Forget it.
    You were thinking about clicking on shit and typing in values.
    Maybe we can keep typing, but nix clicking. Just use arrow keys
    to scroll.
+   Can type the desired number or use arrow keys to scroll up and down.
    Perhaps a top down view of the network with nodes labelled? Done.
-** TODO Change Node Mass
+   
+** DONE Change Node Mass
+   Make a menu for this exactly like Scan Path
+   Also Map damping to controller
+   And release damping.
 ** TODO Change Connection Matrix
+   This is gonna be complex.
+   Create new function to handle it. And draw it. Duh.
+   not going to draw the scanner. Just connectivity matrix.
 ** TODO Change EQ Position
-** TODO Select Hammer Table
+   Damn Idk For this one actually.
+** DONE Select Hammer Table
+   Map to Controller.
+** TODO Help Menu
+   Print out the possible commands at the home screen.
 * DONE Rotate Viewer
   Easy.
-* TODO Visualize Scan Path
+* TODO 2D Visualize Scan Path
+  This would be easy so I'm not really worried about it.
 
 
 Hard:
 * TODO Adaptive Sampling and Anti-Aliasing
 
+
+Known bugs:
+Sometimes hangs on exit.
+//Weird segfault and memory corruption.
+Viewer has fisheye distortion going on.
