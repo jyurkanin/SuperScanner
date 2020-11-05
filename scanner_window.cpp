@@ -12,7 +12,7 @@ static SuperScanner *scanner;
 
 void breakerbreaker(){}
 
-Vector3f origin = {-3,8,0};
+Vector3f origin = {-3,16,0};
 float viewer_angle = -.1;
 
 
@@ -370,6 +370,7 @@ void draw_text_boxes(int * params){
     
     num = params[i];
     sprintf(snum, "%d", num);
+    num_len = 0;
     if(num < 10)
       num_len = 1;
     else if(num < 100)
@@ -427,7 +428,7 @@ void handle_scanner_node_menu(Display *dpy, Window w, GC gc, int &menu_id, int &
       }
       switch(XLookupKeysym(&e.xkey, 0)){
       case XK_Left:
-	node_sel = std::max(0, node_sel); //I like this function.
+	node_sel = std::max(0, node_sel-1); //I like this function.
 	count = 0;
 	break;
       case XK_Right:
@@ -552,19 +553,13 @@ void draw_node_labels(Vector3f *node_pos, int num_nodes){
   XDrawPoints(dpy, w, gc, xpoints, num_nodes, CoordModeOrigin);
 
   int num_len;
-  char num[4]; //limited to 3 digit numbers. Plz dont make me do more.
+  char num[20]; //limited to 3 digit numbers. Plz dont make me do more.
   memset(num, 0, 4);
 
   for(int i = 0; i < num_nodes; i++){
     sprintf(num, "%d", i);
     //I Don't care if there is a better way to do this. Its good enough.
-    if(i < 10)
-      num_len = 1;
-    else if(i < 100)
-      num_len = 2;
-    else if(i < 1000)
-      num_len = 3;
-    
+    num_len = strlen(num);
     XDrawString(dpy, w, gc, xpoints[i].x, xpoints[i].y, num, num_len);
   }
 }

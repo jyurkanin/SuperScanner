@@ -1,4 +1,4 @@
-CFLAGS= -g -D__LINUX_ASLA -Wall
+CFLAGS= -g -D__LINUX_ASLA -Wall -O3
 LIBS= -lm -lpthread -lasound -lX11
 
 all: main.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engine.o

@@ -63,12 +63,12 @@ SuperScanner Todo List
    Make a menu for this exactly like Scan Path
    Also Map damping to controller
    And release damping.
-** TODO Change Connection Matrix
+** DONE Change Connection Matrix
    This is gonna be complex.
    Create new function to handle it. And draw it. Duh.
    not going to draw the scanner. Just connectivity matrix.
 ** TODO Change EQ Position
-   Damn Idk For this one actually.
+   Do a 3 row menu thing.
 ** DONE Select Hammer Table
    Map to Controller.
 ** TODO Help Menu
@@ -77,13 +77,15 @@ SuperScanner Todo List
   Easy.
 * TODO 2D Visualize Scan Path
   This would be easy so I'm not really worried about it.
-
+* TODO Runge-Kutta instead of Euler
+  Better accuracy. Less oscillation. Possibly a bit faster.
 
 Hard:
 * TODO Adaptive Sampling and Anti-Aliasing
 
 
 Known bugs:
-Sometimes hangs on exit.
+//Sometimes hangs on exit.
+Excessive connectivity leads to instability :(
 //Weird segfault and memory corruption.
 Viewer has fisheye distortion going on.

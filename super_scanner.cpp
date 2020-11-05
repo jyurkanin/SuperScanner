@@ -4,6 +4,8 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <algorithm>
+#include <stdlib.h>
+
 
 void break_on_me(){}
   
@@ -43,6 +45,8 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   displacement_matrix = new float[num_nodes*num_nodes];
   memset(stiffness_matrix, 0, sizeof(float)*num_nodes*num_nodes);
   memset(displacement_matrix, 0, sizeof(float)*num_nodes*num_nodes);
+
+
   for(int i = 0; i < num_nodes-1; i++){
     //fill the two diagnols off the main diagnol with 1's for a string.
     stiffness_matrix[(i*num_nodes) + (i+1)] = 1.0;
@@ -52,6 +56,15 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
     displacement_matrix[((i+1)*num_nodes) + i] = 1.0;
   }
   
+
+  for(int i = 1; i < num_nodes-1; i++){
+    for(int j = i+1; j < num_nodes-1; j++){
+      stiffness_matrix[(i*num_nodes) + j] = rand()/(4.0f*RAND_MAX);
+      displacement_matrix[(i*num_nodes) + j] = 1.0; //natural displacement of the spring
+    } 
+  }
+  
+  
   constrained_nodes = new int[num_nodes];
   memset(constrained_nodes, 0, num_nodes*sizeof(int));
   constrained_nodes[0] = 1;
@@ -60,7 +73,7 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   node_damping = new int[num_nodes];
   restoring_stiffness = .01;
   for(int i = 0; i < num_nodes; i++){
-    node_damping[i] = 1;
+    node_damping[i] = 20;
   }
   
 
@@ -73,19 +86,13 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
     node_pos[i] = Vector3f(0, i, 0);
     node_vel[i] = Vector3f(0, 0, 0);
   }
-
-  node_eq_pos[num_nodes-1][0] = 2;
-  node_eq_pos[num_nodes-1][2] = 0;
-
-  node_pos[num_nodes-1][0] = 2;
-  node_pos[num_nodes-1][2] = 0;
   
   node_mass = new int[num_nodes];
   for(int i = 0; i < num_nodes; i++){
     node_mass[i] = 1;
   }
   
-  timestep = .001; //randomly chosen. .01 was unstable.
+  timestep = .0001; //randomly chosen. .01 was unstable.
 
   sample_rate = 44100;
   
