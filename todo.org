@@ -67,25 +67,48 @@ SuperScanner Todo List
    This is gonna be complex.
    Create new function to handle it. And draw it. Duh.
    not going to draw the scanner. Just connectivity matrix.
-** TODO Change EQ Position
+** DONE Change EQ Position
    Do a 3 row menu thing.
+** DONE Select Nodes to be Constrained
+   Do a row. Reuse the old code. No big deal.
+   Easy Peasy.
 ** DONE Select Hammer Table
    Map to Controller.
 ** TODO Help Menu
    Print out the possible commands at the home screen.
 * DONE Rotate Viewer
   Easy.
-* TODO 2D Visualize Scan Path
+* TODO Panning Rotating Viewer
+  Panning rotating view? Ooh, map it to a button. Easy.
+* DONE 2D Visualize Scan Path
   This would be easy so I'm not really worried about it.
-* TODO Runge-Kutta instead of Euler
+  Will Do now.
+* TODO 3D Visualize Scan Path
+  Show the Scan Path Changing over time. Would be sick.
+  Also rainbow over time.
+* DONE Runge-Kutta instead of Euler
   Better accuracy. Less oscillation. Possibly a bit faster.
+  I dont notice any difference in sound. It does seem more accurate
+  Because there is less high freq oscillation.
+  I am running at .01 timestep and it seems still accurate. Which is
+  greatly improved. Actually, Noticing inaccuracy at .01s timestep.
+  Prefer .001
+
+* DONE Better Scan Path Interpolation
+  Need to do a first order interp between old table and new table.
+  Prevent Discontinuities.. Hopefully improve sound quality.
+  Implemented. No change in sound after viewing through audacity.
 
 Hard:
 * TODO Adaptive Sampling and Anti-Aliasing
-
-
-Known bugs:
+  This will be tough.
+* TODO Map strikes to piano pedal.
+  So note can ring out as frequency changes leading to a cool effect.
+* TODO ADSR. 
+  Color of scanner changes with ADSR gain.
+  Would be cool.
+* Known bugs:
+With RK4, something weird is happening and not every strike gets counted.
 //Sometimes hangs on exit.
-Excessive connectivity leads to instability :(
 //Weird segfault and memory corruption.
 Viewer has fisheye distortion going on.

@@ -17,6 +17,7 @@ int is_window_open(){
 SuperScanner::SuperScanner(int s) : num_nodes(s){
   is_window_open_ = 1;
   sim_mutex = 0;
+  has_scan_update = 0;
   release_flag = 0;
   
   controller = Controller();
@@ -33,6 +34,11 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   hammer_num = 0;
   hammer_table = new float[scan_len];
   scan_path = new int[scan_len];
+  scan_table = new float[scan_len];
+  old_scan_table = new float[scan_len];
+
+  memset(scan_table, 0, sizeof(float)*scan_len);
+  memset(old_scan_table, 0, sizeof(float)*scan_len);
   
   for(int i = 0; i < scan_len; i++){
       scan_path[i] = i;
@@ -55,14 +61,19 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
     stiffness_matrix[((i+1)*num_nodes) + i] = 1.0;
     displacement_matrix[((i+1)*num_nodes) + i] = 1.0;
   }
-  
 
-  for(int i = 1; i < num_nodes-1; i++){
-    for(int j = i+1; j < num_nodes-1; j++){
-      stiffness_matrix[(i*num_nodes) + j] = rand()/(4.0f*RAND_MAX);
-      displacement_matrix[(i*num_nodes) + j] = 1.0; //natural displacement of the spring
+  /*
+  float temp;
+  for(int i = 0; i < num_nodes; i++){
+    for(int j = i+1; j < num_nodes; j++){
+        temp = (4.0f*rand())/RAND_MAX;
+        stiffness_matrix[(i*num_nodes) + j] = temp;
+        displacement_matrix[(i*num_nodes) + j] = 1.0;
+        stiffness_matrix[(j*num_nodes) + i] = temp;
+        displacement_matrix[(j*num_nodes) + i] = 1.0;
     } 
   }
+  */
   
   
   constrained_nodes = new int[num_nodes];
@@ -71,9 +82,9 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   constrained_nodes[num_nodes-1] = 1;
   
   node_damping = new int[num_nodes];
-  restoring_stiffness = .01;
+  restoring_stiffness = 0;
   for(int i = 0; i < num_nodes; i++){
-    node_damping[i] = 20;
+    node_damping[i] = 1;
   }
   
 
@@ -92,7 +103,7 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
     node_mass[i] = 1;
   }
   
-  timestep = .0001; //randomly chosen. .01 was unstable.
+  timestep = .001; //randomly chosen. .01 was unstable.
 
   sample_rate = 44100;
   
@@ -125,6 +136,12 @@ SuperScanner::~SuperScanner(){
 float SuperScanner::tick(int note, float volume){
   static int was_released = 1;
   static float p_freq = 0;
+  static uint32_t k_update = 0;
+
+  if(has_scan_update){
+      k_update = k_;
+      has_scan_update = 0;
+  }
   
   float freq = 0;
   if(note != -1){
@@ -137,15 +154,33 @@ float SuperScanner::tick(int note, float volume){
   //  if((k_ % 10) == 0){
   //    log_file << freq << "," << p_freq << '\n';
   //  }
+
+  compute_scan_table();
   
   float idx = fmod(p_freq*k_*scan_len/sample_rate, scan_len);
   int lower = floorf(idx);
   float diff = idx - lower;
-  float sample = node_pos[scan_path[lower]][2]*(1-diff) + node_pos[scan_path[lower+1]][2]*(diff);
+  float sample = scan_table[lower]*(1-diff) + scan_table[lower+1]*(diff); //interpolate along scan table axis
+  float old_sample = old_scan_table[lower]*(1-diff) + old_scan_table[lower+1]*(diff);
+
+  diff = std::min(1.0f, (k_ - k_update)/(44100.0f*timestep));
+  float i_sample = sample*diff + old_sample*(1-diff); //interpolate along time axis.
+  
+  
+  for(int i = 0; i < scan_len; i++){
+      old_scan_table[i] = scan_table[i];
+  }
+  
   
   k_++;
   was_released = release_flag;
-  return sample * .005 * m_volume * volume / 127.0;
+  return i_sample * .005 * m_volume * volume / 127.0;
+}
+
+void SuperScanner::compute_scan_table(){
+    for(int i = 0; i < scan_len; i++){
+        scan_table[i] = node_pos[scan_path[i]][2]; //this is one possible method. Other methods include eq displacement or vector norm.
+    }
 }
 
 void* SuperScanner::simulate_wrapper(void *context){
@@ -154,47 +189,98 @@ void* SuperScanner::simulate_wrapper(void *context){
 }
 
 void SuperScanner::simulate(){
-  struct timeval start, end;
+    struct timeval start, end;
 
-  while(is_window_open_){
-    unsigned int usecs = 100;
-    gettimeofday(&start, NULL);
+    Vector3f X[num_nodes*2];
+    Vector3f X1[num_nodes*2];
+    Vector3f temp[num_nodes*2];
 
-    if(!sim_mutex){
-      ODE(node_acc);
-      for(int i = 0; i < num_nodes; i++){
-	if(constrained_nodes[i])
-	  continue;
-	node_pos[i] += node_vel[i]*timestep;
-	node_vel[i] += node_acc[i]*timestep;
-      }
+    Vector3f k1[num_nodes*2];
+    Vector3f k2[num_nodes*2];
+    Vector3f k3[num_nodes*2];
+    Vector3f k4[num_nodes*2];
+    
+    while(is_window_open_){
+        unsigned int usecs = 1000;
+        gettimeofday(&start, NULL);
+        
+        if(!sim_mutex){
+            for(int i = 0; i < num_nodes; i++){
+                X[i] = node_pos[i];
+                X[num_nodes+i] = node_vel[i];
+            }
+            
+            ODE(X, k1);
+            for(int i = 0; i < 2*num_nodes; i++){
+                temp[i] = X[i] + (.5*timestep*k1[i]);
+            }
+
+            if(sim_mutex) continue;
+            
+            ODE(temp, k2);
+            for(int i = 0; i < 2*num_nodes; i++){
+                temp[i] = X[i] + (.5*timestep*k2[i]);
+            }
+
+            if(sim_mutex) continue;
+            
+            ODE(temp, k3);
+            for(int i = 0; i < 2*num_nodes; i++){
+                temp[i] = X[i] + (timestep*k3[i]);
+            }
+
+            if(sim_mutex) continue;
+            
+            ODE(temp, k4);
+
+            for(int i = 0; i < 2*num_nodes; i++){
+                X1[i] = X[i] + (timestep/6)*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i]);
+            }
+            
+            if(sim_mutex) continue;
+            
+            for(int i = 0; i < num_nodes; i++){
+                if(constrained_nodes[i]){
+                    node_pos[i] = node_eq_pos[i];
+                    continue;
+                }
+                
+                node_pos[i] = X1[i];
+                node_vel[i] = X1[i+num_nodes];
+            }
+            
+            has_scan_update = 1;
+        }
+
+        
+        
+        gettimeofday(&end, NULL);
+        //ensures each iteration takes a millisecond.
+        unsigned int usec_diff = ((end.tv_sec - start.tv_sec)*1000000) + end.tv_usec - start.tv_usec;
+        unsigned temp = std::min(usec_diff, usecs); //wait at least 1 millisecond.
+        usleep(usecs - temp);
+        
+        end = start;
+        
     }
-    
-    gettimeofday(&end, NULL);
-    //ensures each iteration takes a millisecond.
-    unsigned int usec_diff = ((end.tv_sec - start.tv_sec)*1000000) + end.tv_usec - start.tv_usec;
-    unsigned temp = std::min(usec_diff, usecs); //wait at least 1 millisecond.
-    usleep(usecs - temp);
-    
-    end = start;
-    
-  }
-  printf("Scanner dead\n");
+    printf("Scanner dead\n");
 }
 
 // Xd = ODE(X);
-void SuperScanner::ODE(Vector3f *acc){
-  float timer = 0;
+//Vector3f *acc
+void SuperScanner::ODE(Vector3f *X, Vector3f *Xd){
   Vector3f F_restore;
   Vector3f F_damping;
   Vector3f F_spring;
-  Vector3f F_sum;
+  Vector3f F_sum[num_nodes];
   
   float diff[num_nodes];
   
   Vector3f d_pos[num_nodes];
   float d_pos_norm[num_nodes];
 
+
+  
   Vector3f eq_dist; //displacement from node eq. position.
   
   //Let N be num_nodes
@@ -207,9 +293,9 @@ void SuperScanner::ODE(Vector3f *acc){
   
   for(int i = 0; i < num_nodes; i++){
     //N restoring forces and damping.
-    eq_dist = node_eq_pos[i] - node_pos[i];
+    eq_dist = node_eq_pos[i] - X[i];
     F_restore = eq_dist*(.5*(stiffness_boost + restoring_stiffness)*eq_dist.norm());
-    F_damping = -node_vel[i]*(damping_boost + (node_damping[i]/100.0)); //N damping forces.
+    F_damping = -X[num_nodes+i]*(damping_boost + (node_damping[i]/100.0)); //N damping forces.
 
     //N^2 Stuff.
     F_spring[0] = 0;
@@ -219,18 +305,33 @@ void SuperScanner::ODE(Vector3f *acc){
     for(int j = 0; j < num_nodes; j++){ //I'm hoping that writing it this way will allow the compiler to vectorize easier. Or later I can vectorize it manually.
       float stiff = stiffness_matrix[(i*num_nodes) + j];
       if(stiff == 0) continue;
-      d_pos[j] = node_pos[j] - node_pos[i];
+      d_pos[j] = X[j] - X[i];
       d_pos_norm[j] = d_pos[j].norm();
       diff[j] = d_pos_norm[j];// - displacement_matrix[(i*num_nodes) + j];
       //If(diff[j] < 0) continue; //cant push rope, as they say
       F_spring += d_pos[j]*(.5*stiff*diff[j]*diff[j]/d_pos_norm[j]);
     }
 
-    F_sum = F_spring + F_restore + F_damping;
-    for(int j = 0; j < 3; j++){
-      acc[i][j] = F_sum[j] / (mass_bias + (node_mass[i]/10.0)); //  A = F/m //TODO
-    }
+    F_sum[i] = F_spring + F_restore + F_damping;
   }
+  for(int i = 0; i < num_nodes; i++){
+    for(int j = 0; j < 3; j++){
+      Xd[i+num_nodes][j] = F_sum[i][j] / (mass_bias + (node_mass[i]/10.0));
+    }
+    Xd[i] = X[i+num_nodes];
+  }
+
+  for(int i = 0; i < num_nodes; i++){
+      if(constrained_nodes[i]){
+          Xd[i][0] = 0;
+          Xd[i][1] = 0;
+          Xd[i][2] = 0;
+          Xd[i+num_nodes][0] = 0;
+          Xd[i+num_nodes][1] = 0;
+          Xd[i+num_nodes][2] = 0;
+      }
+  }
+  
 }
 
 void SuperScanner::release(){
@@ -253,9 +354,9 @@ void SuperScanner::strike(){
     node_vel[i][1] = 0;
     node_vel[i][2] = 0;
 
-    node_acc[i][0] = 0;
-    node_acc[i][1] = 0;
-    node_acc[i][2] = 0;
+    //node_acc[i][0] = 0;
+    //node_acc[i][1] = 0;
+    //node_acc[i][2] = 0;
   }
   sim_mutex = 0;
 }
@@ -329,7 +430,7 @@ void SuperScanner::update_params(){
   if(controller.has_new_data()){
     m_volume = 1;//controller.get_slider(0)/127.0;
     restoring_stiffness = controller.get_slider(1);
-    setHammer(controller.get_slider(2));
+    //setHammer(controller.get_slider(2));
     release_stiffness = controller.get_slider(3)/127.0;
     release_damping = controller.get_slider(4)/127.0;
 

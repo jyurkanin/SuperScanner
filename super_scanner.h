@@ -24,6 +24,7 @@ public:
   void release();
   void strike();
   float tick(int note, float volume);
+  void compute_scan_table();
   
   void setHammer(int num);
   
@@ -41,15 +42,16 @@ public:
   const int num_nodes;
   Vector3f *node_pos;
   float *stiffness_matrix; //Oh boyo. Upper triangular. to avoid repetition.
-  int sim_mutex;
+  volatile int sim_mutex;
+  volatile int has_scan_update; //volatile just in case.
   int scan_len; //size of the table getting scanned
   int *scan_path;
   int *node_damping;
   int *node_mass;
-private:
+//private:
   static void* simulate_wrapper(void*);
   void simulate();
-  void ODE(Vector3f *acc);
+  void ODE(Vector3f *X, Vector3f *Xd);
   
   float freqs[12] = {27.5, 29.135, 30.868, 32.703, 34.648, 36.708, 38.891, 41.203, 43.654, 46.249, 48.999, 51.913}; // frequencies of the lowest octave
   Controller controller;
@@ -70,6 +72,8 @@ private:
   float stiffness_bias;
   
   uint32_t k_;
+  float *scan_table;
+  float *old_scan_table;
   float *hammer_table;
   float *displacement_matrix; //Also upper triangular. Represents the equillibrium length of the spring connecting two nodes.
   int *constrained_nodes;

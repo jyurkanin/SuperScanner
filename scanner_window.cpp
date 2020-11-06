@@ -12,8 +12,8 @@ static SuperScanner *scanner;
 
 void breakerbreaker(){}
 
-Vector3f origin = {-3,16,0};
-float viewer_angle = -.1;
+Vector3f origin = {-3,31.5,0};
+float viewer_angle = -.2;
 
 
 
@@ -43,6 +43,40 @@ int get_num(){ //read the keyboard for a number
 }
 
 
+
+void handle_scanner_2d_menu(Display *dpy, Window w, GC gc, int &menu_id){
+    XEvent e;
+    KeySym ks = 0;
+    char buf[2];
+    if(XPending(dpy) > 0){
+        XNextEvent(dpy, &e);
+        if(e.type == KeyPress){
+            XLookupString(&e.xkey, buf, 1, &ks, NULL);
+            switch(buf[0]){
+            case 'x':
+                menu_id = SCANNER_3D_MENU;
+                break;
+            }
+        }
+    }
+}
+
+void draw_scanner_2d_menu(Display *dpy, Window w, GC gc){
+    //printf("Scan Len %d\n", scanner->scan_len);
+    float interval_x = SCREEN_WIDTH / (scanner->scan_len-1);
+    
+    XSegment scan_segs[scanner->scan_len];
+    for(int i = 0; i < scanner->scan_len-1; i++){
+        scan_segs[i].x1 = i*interval_x;
+        scan_segs[i].y1 = (SCREEN_HEIGHT/2) + scanner->node_pos[i][2]*50;
+        scan_segs[i].x2 = (i+1)*interval_x;
+        scan_segs[i].y2 = (SCREEN_HEIGHT/2) + scanner->node_pos[i+1][2]*50;
+    }
+
+    XSetForeground(dpy, gc, 0xFF0000);
+    XDrawSegments(dpy, w, gc, scan_segs, scanner->scan_len);
+}
+
 void draw_connectivity_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_sel_y){
   //Draw Upper Triangular Grid.
   int offset_x = 20;
@@ -52,7 +86,7 @@ void draw_connectivity_menu(Display *dpy, Window w, GC gc, int node_sel_x, int n
   
   XSegment grid_segs[(scanner->num_nodes + 1) * 2];
 
-  breakerbreaker();
+  //breakerbreaker();
   //rows. First row doesnt follow pattern.
   grid_segs[0].x1 = offset_x;
   grid_segs[0].y1 = offset_y;
@@ -219,48 +253,65 @@ void draw_scanner(Display *dpy, Window w, GC gc, int mono){
 
 
 void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono){
-  XEvent e;
-  char buf[2];
-
-  if(XPending(dpy) > 0){
-    XNextEvent(dpy, &e);
-    if(e.type == KeyPress){
-      XLookupString(&e.xkey, buf, 1, NULL, NULL);
-      switch(buf[0]){
-      case 'm':
-	mono = !mono;
-	break;
-      case 's':
-	scanner->sim_mutex = 1;
-	menu_id = SCAN_PATH_MENU;
-	break;
-      case 'n':
-	scanner->sim_mutex = 1;
-	menu_id = NODE_MASS_MENU;
-	break;
-      case 'd':
-	scanner->sim_mutex = 1;
-	menu_id = NODE_DAMPING_MENU;
-	break;
-      case 'c':
-	scanner->sim_mutex = 1;
-	menu_id = CONNECTIVITY_MENU;
-	break;
-      case 'p':
-	scanner->sim_mutex = 1;
-	break;
-      case 'r':
-	scanner->sim_mutex = 0;
-	break;
-      case 'x':
-	scanner->stop();
-	printf("Window Thread, Peacin' out\n");
-	break;
-      }
+    XEvent e;
+    char buf[2];
+    
+    //MAIN MENU
+    if(XPending(dpy) > 0){
+        XNextEvent(dpy, &e);
+        if(e.type == KeyPress){
+            XLookupString(&e.xkey, buf, 1, NULL, NULL);
+            switch(buf[0]){
+            case 'm':
+                mono = !mono;
+                break;
+            case 's':
+                scanner->sim_mutex = 1;
+                menu_id = SCAN_PATH_MENU;
+                break;
+            case 'n':
+                scanner->sim_mutex = 1;
+                menu_id = NODE_MASS_MENU;
+                break;
+            case 'd':
+                scanner->sim_mutex = 1;
+                menu_id = NODE_DAMPING_MENU;
+                break;
+            case 'c':
+                scanner->sim_mutex = 1;
+                menu_id = CONNECTIVITY_MENU;
+                break;
+            case 'p':
+                scanner->sim_mutex = 1;
+                break;
+            case 'r':
+                scanner->sim_mutex = 0;
+                break;
+            case 'x':
+                scanner->stop();
+                printf("Window Thread, Peacin' out\n");
+                break;
+            case 'v':
+                menu_id = SCANNER_2D_MENU;
+                break;
+            case 'o':
+                scanner->sim_mutex = 1;
+                menu_id = CONSTRAINT_MENU;
+                break;
+            case 'l':
+                scanner->sim_mutex = 1;
+                menu_id = EQ_POS_MENU;
+                break;
+            }
+            
+        }
     }
-  }
 }
 
+void draw_node_constraint_menu(Display *dpy, Window w, GC gc, int &node_sel){
+    XDrawString(dpy, w, gc, SCREEN_WIDTH/2, 20, "Node Damping Menu", 17);
+    draw_scanner_node_menu(dpy, w, gc, node_sel, scanner->constrained_nodes);
+}
 void draw_node_damping_menu(Display *dpy, Window w, GC gc, int node_sel){
   XDrawString(dpy, w, gc, SCREEN_WIDTH/2, 20, "Node Damping Menu", 17);
   draw_scanner_node_menu(dpy, w, gc, node_sel, scanner->node_damping);
@@ -273,6 +324,91 @@ void draw_node_mass_menu(Display *dpy, Window w, GC gc, int node_sel){
   XDrawString(dpy, w, gc, SCREEN_WIDTH/2, 20, "Node Mass Menu", 14);
   draw_scanner_node_menu(dpy, w, gc, node_sel, scanner->node_mass);
 }
+
+void draw_eq_pos_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_sel_y){
+    int actual_len = 0;
+    int num_nodes = scanner->num_nodes;
+    Vector3f start[1+(num_nodes*num_nodes/2)]; //throw in a random +1 to avoid off by one errors. in case num_nodes=7, 7*7/2 = 49/2 = 24.5 = 24 which would be one less than needed.
+    Vector3f end[1+(num_nodes*num_nodes/2)];
+    Vector3f node_pos_rot[scanner->num_nodes];
+    
+    Matrix3f rot = get_rotation(0, viewer_angle, 0);
+  
+    for(int i = 0; i < num_nodes; i++){ //row
+        node_pos_rot[i] = rot*scanner->node_pos[i];
+        for(int j = i; j < num_nodes; j++){ //column. //searches only upper Triangluar part.
+            if(scanner->stiffness_matrix[(i*num_nodes)+j] > 0){ //connection exists. Add to list.
+                start[actual_len] = rot*scanner->node_pos[i];
+                end[actual_len] = rot*scanner->node_pos[j];
+                actual_len++;
+            }
+        }
+    }
+    
+    draw_mono_lines(start, end, actual_len);
+    draw_node_labels(node_pos_rot, num_nodes);
+
+    
+    float offset_x = 20;
+    float interval_x = (SCREEN_WIDTH - (offset_x*2)) / (scanner->scan_len-1);
+    float interval_y = 20;
+    XSegment sel_segs[4];
+    XSegment segments[4 + scanner->scan_len + 1]; //3 rows, num_nodes cols.
+    
+    sel_segs[0].x1 = interval_x*node_sel_x + offset_x;
+    sel_segs[0].y1 = SCREEN_HEIGHT - (interval_y*node_sel_y);
+    sel_segs[0].x2 = interval_x*(node_sel_x+1) + offset_x;
+    sel_segs[0].y2 = SCREEN_HEIGHT - (interval_y*node_sel_y);
+
+    sel_segs[1].x1 = interval_x*(node_sel_x+1) + offset_x;
+    sel_segs[1].y1 = SCREEN_HEIGHT - (interval_y*node_sel_y);
+    sel_segs[1].x2 = interval_x*(node_sel_x+1) + offset_x;
+    sel_segs[1].y2 = SCREEN_HEIGHT - (interval_y*(node_sel_y+1));
+
+    sel_segs[2].x1 = interval_x*(node_sel_x+1) + offset_x;
+    sel_segs[2].y1 = SCREEN_HEIGHT - (interval_y*(node_sel_y+1));
+    sel_segs[2].x2 = interval_x*(node_sel_x) + offset_x;
+    sel_segs[2].y2 = SCREEN_HEIGHT - (interval_y*(node_sel_y+1));
+
+    sel_segs[3].x1 = interval_x*(node_sel_x) + offset_x;
+    sel_segs[3].y1 = SCREEN_HEIGHT - (interval_y*(node_sel_y+1));
+    sel_segs[3].x2 = interval_x*(node_sel_x) + offset_x;
+    sel_segs[3].y2 = SCREEN_HEIGHT - (interval_y*(node_sel_y));
+    
+    for(int i = 0; i < 4; i++){
+        segments[i].x1 = offset_x;
+        segments[i].y1 = SCREEN_HEIGHT - i*interval_y - 1;
+        segments[i].x2 = SCREEN_WIDTH - offset_x;
+        segments[i].y2 = SCREEN_HEIGHT - i*interval_y - 1;
+    }
+
+    for(int i = 0; i < scanner->scan_len; i++){
+        segments[i+4].x1 = (interval_x * i) + offset_x;
+        segments[i+4].y1 = SCREEN_HEIGHT - (interval_y*3) - 1;
+        segments[i+4].x2 = (interval_x * i) + offset_x;
+        segments[i+4].y2 = SCREEN_HEIGHT;
+    }
+    
+
+    int num_len;
+    char num[12];
+    for(int i = 0; i < scanner->num_nodes; i++){
+        for(int j = 0; j < 3; j++){
+            sprintf(num, "%.1f", scanner->node_eq_pos[i][j]);
+            num_len = strlen(num);
+            XDrawString(dpy, w, gc, (i+.5)*interval_x + offset_x, SCREEN_HEIGHT - (((2-j)+.5)*interval_y), num, num_len);
+        }
+    }
+    
+    
+    XSetForeground(dpy, gc, 0xFF0000);
+    XDrawSegments(dpy, w, gc, sel_segs, 4);
+    
+    XSetForeground(dpy, gc, 0xFF00);
+    XDrawSegments(dpy, w, gc, segments, 4 + scanner->num_nodes + 1);
+    
+}
+
 void draw_scanner_node_menu(Display *dpy, Window w, GC gc, int node_sel, int *params){
   //Draw 1/2 size mono scanner. Label Nodes.
   int actual_len = 0;
@@ -300,6 +436,8 @@ void draw_scanner_node_menu(Display *dpy, Window w, GC gc, int node_sel, int *pa
   draw_text_boxes(params);
   draw_select_box(node_sel);
 }
+
+
 
 void draw_select_box(int node_sel){
   XSegment sel_segments[4];
@@ -384,7 +522,66 @@ void draw_text_boxes(int * params){
   XDrawSegments(dpy, w, gc, segments, num_segs);
 }
 
+void handle_eq_pos_menu(Display *dpy, Window w, GC gc, int &node_sel_x, int &node_sel_y, int &menu_id){
+    XEvent e;
+    KeySym ks = 0;
+    char buf[2];
+    static char number[128];
+    static int count = 0;
+    float parsed_num = 0;
+    float max_value = 100; //random.
+    
+  
+    if(XPending(dpy) > 0){
+        XNextEvent(dpy, &e);
+        if(e.type == KeyPress){
+            XLookupString(&e.xkey, buf, 1, &ks, NULL);
+            
+            if(isdigit(buf[0]) || (buf[0] == '.')){
+                number[count] = buf[0];
+                count++;
+            }
+            if(ks == 0xFF0D){
+                number[count] = 0;
+                sscanf(number, "%f", &parsed_num);
+                printf("PARSED %f\n", parsed_num);
+                if(parsed_num < max_value){
+                    scanner->node_eq_pos[node_sel_x][node_sel_y] = parsed_num;
+                }
+                count = 0;
+            }
+            
+            switch(buf[0]){
+            case 'x':
+                scanner->sim_mutex = 0;
+                menu_id = SCANNER_3D_MENU;
+                break;
+            }
+            switch(XLookupKeysym(&e.xkey, 0)){
+            case XK_Left:
+                node_sel_x = std::max(0, node_sel_x-1); //I like this function.
+                count = 0;
+                break;
+            case XK_Right:
+                node_sel_x = std::min(scanner->num_nodes-1, node_sel_x+1); //me gusta
+                count = 0;
+                break;
+            case XK_Down:
+                node_sel_y = std::max(0, node_sel_y-1); //I like this function.
+                count = 0;
+                break;
+            case XK_Up:
+                node_sel_y = std::min(2, node_sel_y+1); //me gusta
+                count = 0;
+                break;
+            }
+        }
+    }  
+}
 
+void handle_node_constraint_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel){
+  handle_scanner_node_menu(dpy, w, gc, menu_id, node_sel, scanner->constrained_nodes, 100);
+}
 void handle_node_damping_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel){
   handle_scanner_node_menu(dpy, w, gc, menu_id, node_sel, scanner->node_damping, 100);
 }
@@ -455,6 +652,8 @@ void* window_thread(void*){
 
   int node_sel_x = 0; //Connectivity matrix
   int node_sel_y = 0;
+
+  int flag = 0;
   
   XSetBackground(dpy, gc, 0);
   while(is_window_open()){
@@ -462,7 +661,8 @@ void* window_thread(void*){
     switch(menu_id){
     case SCANNER_3D_MENU: //Main Menu Section=============================================
       draw_scanner(dpy, w, gc, mono);
-      handle_scanner_menu(dpy, w, gc, menu_id, mono);      
+      handle_scanner_menu(dpy, w, gc, menu_id, mono);
+      flag = 1;
       break;
     case SCAN_PATH_MENU: //Scan Path Selection Menu=================================
       draw_scan_path_menu(dpy, w, gc, node_sel);
@@ -480,7 +680,23 @@ void* window_thread(void*){
       draw_connectivity_menu(dpy, w, gc, node_sel_x, node_sel_y);
       handle_connectivity_menu(dpy, w, gc, menu_id, node_sel_x, node_sel_y);
       break;
-     
+    case SCANNER_2D_MENU: //Connection Matrix Menu=================================
+      draw_scanner_2d_menu(dpy, w, gc);
+      handle_scanner_2d_menu(dpy, w, gc, menu_id);
+      break;
+    case CONSTRAINT_MENU: //Connection Matrix Menu=================================
+        draw_node_constraint_menu(dpy, w, gc, node_sel);
+        handle_node_constraint_menu(dpy, w, gc, menu_id, node_sel);
+        break;
+    case EQ_POS_MENU: //Connection Matrix Menu=================================
+        if(flag){
+            node_sel_x = 0;
+            node_sel_y = 0;
+            flag = 0;
+        }
+        draw_eq_pos_menu(dpy, w, gc, node_sel_x, node_sel_y);
+        handle_eq_pos_menu(dpy, w, gc, node_sel_x, node_sel_y, menu_id);
+        break;     
     default: //Never get here. Pls.
       break;
     }

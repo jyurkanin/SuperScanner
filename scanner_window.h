@@ -30,6 +30,10 @@
 #define NODE_MASS_MENU 2
 #define NODE_DAMPING_MENU 3
 #define CONNECTIVITY_MENU 4
+#define SCANNER_2D_MENU 5
+#define CONSTRAINT_MENU 6
+#define EQ_POS_MENU 7
+
 
 using namespace Eigen;
 
@@ -74,17 +78,25 @@ void* window_thread(void*);
 void draw_scanner(Display *dpy, Window w, GC gc);
 void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono);
 
+void handle_eq_pos_menu(Display *dpy, Window w, GC gc, int &node_sel_x, int &node_sel_y, int &menu_id);
+void handle_scanner_2d_menu(Display *dpy, Window w, GC gc, int &menu_id);
 void handle_connectivity_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel_x, int &node_sel_y);
 void handle_node_mass_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
 void handle_scan_path_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
 void handle_node_damping_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
+void handle_node_constraint_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
 void handle_scanner_node_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel, int *params, int max);
 
+
+void draw_eq_pos_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_sel_y);
+void draw_scanner_2d_menu(Display *dpy, Window w, GC gc);
 void draw_connectivity_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_sel_y);
 void draw_scan_path_menu(Display *dpy, Window w, GC gc, int node_sel);
 void draw_node_mass_menu(Display *dpy, Window w, GC gc, int node_sel);
 void draw_node_damping_menu(Display *dpy, Window w, GC gc, int node_sel);
+void draw_node_constraint_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
 void draw_scanner_node_menu(Display *dpy, Window w, GC gc, int node_sel, int *params);
+
 
 void draw_node_labels(Vector3f *node_pos, int num_nodes);
 void draw_text_boxes(int * params);
