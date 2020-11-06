@@ -12,9 +12,9 @@ static SuperScanner *scanner;
 
 void breakerbreaker(){}
 
-Vector3f origin = {-3,31.5,0};
-float viewer_angle = -.2;
-
+Vector3f origin = {-8,3.5,0};
+float viewer_angle = 0;
+float d_angle = 0;
 
 
 
@@ -229,6 +229,7 @@ void draw_scanner(Display *dpy, Window w, GC gc, int mono){
   Vector3f node_pos_rot[scanner->num_nodes];
   
   Matrix3f rot = get_rotation(0, viewer_angle, 0);
+  viewer_angle += d_angle;
   
   for(int i = 0; i < num_nodes; i++){ //row
     node_pos_rot[i] = rot*scanner->node_pos[i];
@@ -262,6 +263,9 @@ void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono)
         if(e.type == KeyPress){
             XLookupString(&e.xkey, buf, 1, NULL, NULL);
             switch(buf[0]){
+            case ' ':
+                scanner->strike();
+                break;
             case 'm':
                 mono = !mono;
                 break;
@@ -302,6 +306,13 @@ void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono)
                 scanner->sim_mutex = 1;
                 menu_id = EQ_POS_MENU;
                 break;
+            case 'y':
+                if(d_angle == 0)
+                    d_angle = -.01;
+                else
+                    d_angle = 0;
+                        
+                break;
             }
             
         }
@@ -309,7 +320,7 @@ void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono)
 }
 
 void draw_node_constraint_menu(Display *dpy, Window w, GC gc, int &node_sel){
-    XDrawString(dpy, w, gc, SCREEN_WIDTH/2, 20, "Node Damping Menu", 17);
+    XDrawString(dpy, w, gc, SCREEN_WIDTH/2, 20, "Node Constraint Menu", 17);
     draw_scanner_node_menu(dpy, w, gc, node_sel, scanner->constrained_nodes);
 }
 void draw_node_damping_menu(Display *dpy, Window w, GC gc, int node_sel){
@@ -333,6 +344,7 @@ void draw_eq_pos_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_se
     Vector3f node_pos_rot[scanner->num_nodes];
     
     Matrix3f rot = get_rotation(0, viewer_angle, 0);
+    viewer_angle += d_angle;
   
     for(int i = 0; i < num_nodes; i++){ //row
         node_pos_rot[i] = rot*scanner->node_pos[i];
@@ -394,9 +406,9 @@ void draw_eq_pos_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_se
     char num[12];
     for(int i = 0; i < scanner->num_nodes; i++){
         for(int j = 0; j < 3; j++){
-            sprintf(num, "%.1f", scanner->node_eq_pos[i][j]);
+            sprintf(num, "%.1f", scanner->node_eq_pos[i][2-j]);
             num_len = strlen(num);
-            XDrawString(dpy, w, gc, (i+.5)*interval_x + offset_x, SCREEN_HEIGHT - (((2-j)+.5)*interval_y), num, num_len);
+            XDrawString(dpy, w, gc, (i+.5)*interval_x + offset_x, SCREEN_HEIGHT - ((j+.5)*interval_y), num, num_len);
         }
     }
     
@@ -418,6 +430,7 @@ void draw_scanner_node_menu(Display *dpy, Window w, GC gc, int node_sel, int *pa
   Vector3f node_pos_rot[scanner->num_nodes];
   
   Matrix3f rot = get_rotation(0, viewer_angle, 0);
+  viewer_angle += d_angle;
   
   for(int i = 0; i < num_nodes; i++){ //row
     node_pos_rot[i] = rot*scanner->node_pos[i];
@@ -544,9 +557,8 @@ void handle_eq_pos_menu(Display *dpy, Window w, GC gc, int &node_sel_x, int &nod
             if(ks == 0xFF0D){
                 number[count] = 0;
                 sscanf(number, "%f", &parsed_num);
-                printf("PARSED %f\n", parsed_num);
                 if(parsed_num < max_value){
-                    scanner->node_eq_pos[node_sel_x][node_sel_y] = parsed_num;
+                    scanner->node_eq_pos[node_sel_x][2-node_sel_y] = parsed_num;
                 }
                 count = 0;
             }

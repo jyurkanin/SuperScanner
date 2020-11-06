@@ -56,7 +56,7 @@ void *audio_thread(void *arg){
 	if(midiNotesPressed[k]){
 	  volume = midiNotesPressed[k];
 	  midiNotesPressed[k] = 0;
-	  scanner->strike();
+	  //scanner->strike();
 	  
 	  last_note = curr_note;
 	  curr_note = k;
@@ -234,11 +234,12 @@ void *midi_loop(void *ignoreme){
       midiNotesPressed[packet[1]] = packet[2];            
       break;
     case(PEDAL):
-      if(sustain >= 64 && packet[2] < 64){ //if the sustain is released.
-	for(int i = 0; i < 128; i++){ //releases all the notes and sets the sustained notes to 0.
-	  midiNotesReleased[i] |= midiNotesSustained[i];
-	  midiNotesSustained[i] = 0;
-	}
+        if(sustain >= 64 && packet[2] < 64){ //if the sustain is released.
+            for(int i = 0; i < 128; i++){ //releases all the notes and sets the sustained notes to 0.
+                midiNotesReleased[i] |= midiNotesSustained[i];
+                midiNotesSustained[i] = 0;
+                scanner->strike();
+            }
       }
       sustain = packet[2];
       break;

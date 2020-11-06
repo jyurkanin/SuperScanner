@@ -52,7 +52,7 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   memset(stiffness_matrix, 0, sizeof(float)*num_nodes*num_nodes);
   memset(displacement_matrix, 0, sizeof(float)*num_nodes*num_nodes);
 
-
+  
   for(int i = 0; i < num_nodes-1; i++){
     //fill the two diagnols off the main diagnol with 1's for a string.
     stiffness_matrix[(i*num_nodes) + (i+1)] = 1.0;
@@ -62,11 +62,13 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
     displacement_matrix[((i+1)*num_nodes) + i] = 1.0;
   }
 
+
   /*
   float temp;
   for(int i = 0; i < num_nodes; i++){
     for(int j = i+1; j < num_nodes; j++){
-        temp = (4.0f*rand())/RAND_MAX;
+        temp = (.125f*rand())/RAND_MAX;
+        if(temp < .123) continue;
         stiffness_matrix[(i*num_nodes) + j] = temp;
         displacement_matrix[(i*num_nodes) + j] = 1.0;
         stiffness_matrix[(j*num_nodes) + i] = temp;
@@ -78,8 +80,6 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   
   constrained_nodes = new int[num_nodes];
   memset(constrained_nodes, 0, num_nodes*sizeof(int));
-  constrained_nodes[0] = 1;
-  constrained_nodes[num_nodes-1] = 1;
   
   node_damping = new int[num_nodes];
   restoring_stiffness = 0;
@@ -92,11 +92,18 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   node_vel = new Vector3f[num_nodes];
   node_acc = new Vector3f[num_nodes];
   node_eq_pos = new Vector3f[num_nodes];
-  for(int i = 0; i < num_nodes; i++){
-    node_eq_pos[i] = Vector3f(0, i, 0);
-    node_pos[i] = Vector3f(0, i, 0);
-    node_vel[i] = Vector3f(0, 0, 0);
+  for(int i = 0; i < 8; i++){
+        for(int j = 0; j < 8; j++){
+            node_eq_pos[(i*8)+j] = Vector3f(i*4, j*4, 0);
+            node_pos[(i*8)+j] = Vector3f(i*4, j*4, 0);
+            node_vel[(i*8)+j] = Vector3f(0, 0, 0);
+        }
   }
+
+  constrained_nodes[0] = 1;
+  constrained_nodes[7] = 1;
+  constrained_nodes[7*8] = 1;
+  constrained_nodes[num_nodes-1] = 1;
   
   node_mass = new int[num_nodes];
   for(int i = 0; i < num_nodes; i++){
@@ -145,7 +152,7 @@ float SuperScanner::tick(int note, float volume){
   
   float freq = 0;
   if(note != -1){
-    freq = freqs[(note-21) % 12] * (1 << (1+(int)(note-21)/12));
+      freq = (freqs[(note-21) % 12] * (1 << (1+(int)(note-21)/12)))/2;
   }
   
   if((note != -1) && was_released){p_freq = freq;}
@@ -209,6 +216,7 @@ void SuperScanner::simulate(){
                 X[i] = node_pos[i];
                 X[num_nodes+i] = node_vel[i];
             }
+            //Runge-Kutta 4th order method.
             
             ODE(X, k1);
             for(int i = 0; i < 2*num_nodes; i++){

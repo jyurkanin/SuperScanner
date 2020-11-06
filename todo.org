@@ -74,6 +74,7 @@ SuperScanner Todo List
    Easy Peasy.
 ** DONE Select Hammer Table
    Map to Controller.
+** TODO Number Nodes in selection tables
 ** TODO Help Menu
    Print out the possible commands at the home screen.
 * DONE Rotate Viewer
@@ -102,11 +103,13 @@ SuperScanner Todo List
 Hard:
 * TODO Adaptive Sampling and Anti-Aliasing
   This will be tough.
-* TODO Map strikes to piano pedal.
+* DONE Map strikes to piano pedal.
   So note can ring out as frequency changes leading to a cool effect.
 * TODO ADSR. 
   Color of scanner changes with ADSR gain.
   Would be cool.
+* TODO Higher Order Interpolation in Tick.
+  Lead to smoother waveforms. Or just fucking low pass the wave maybe. IDK.
 * Known bugs:
 With RK4, something weird is happening and not every strike gets counted.
 //Sometimes hangs on exit.
