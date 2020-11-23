@@ -47,7 +47,6 @@ void *audio_thread(void *arg){
       
       frames_to_deliver = frames_to_deliver > 441 ? 441 : frames_to_deliver;
       memset(sum_frames, 0, 441*sizeof(float));
-      //memset(stereo_frames, 0, 882*sizeof(float));
       
       
       
@@ -56,7 +55,7 @@ void *audio_thread(void *arg){
 	if(midiNotesPressed[k]){
 	  volume = midiNotesPressed[k];
 	  midiNotesPressed[k] = 0;
-	  //scanner->strike();
+	  scanner->start_adsr();
 	  
 	  last_note = curr_note;
 	  curr_note = k;
@@ -66,7 +65,6 @@ void *audio_thread(void *arg){
 	if(midiNotesReleased[k]){
 	  midiNotesReleased[k] = 0; //lets just pray we dont have race conditions.
 	  if(k == curr_note){ //activate note release.
-	    scanner->release();
 	    curr_note = -1;
 	    last_note = -1;
 	  }
@@ -235,14 +233,16 @@ void *midi_loop(void *ignoreme){
       break;
     case(PEDAL):
         if(sustain >= 64 && packet[2] < 64){ //if the sustain is released.
-            for(int i = 0; i < 128; i++){ //releases all the notes and sets the sustained notes to 0.
-                midiNotesReleased[i] |= midiNotesSustained[i];
-                midiNotesSustained[i] = 0;
-                scanner->strike();
-            }
-      }
-      sustain = packet[2];
-      break;
+	  for(int i = 0; i < 128; i++){ //releases all the notes and sets the sustained notes to 0.
+	    midiNotesReleased[i] |= midiNotesSustained[i];
+	    midiNotesSustained[i] = 0;
+	  }
+	}
+	if(sustain < 64 && packet[2] >= 64){
+	  scanner->strike();
+	}
+	sustain = packet[2];
+	break;
     case(PITCH_BEND):
       bend = packet[2];
       break;

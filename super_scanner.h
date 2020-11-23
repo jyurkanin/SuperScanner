@@ -23,6 +23,8 @@ public:
   
   void release();
   void strike();
+  void start_adsr();
+  void get_adsr_gain();
   float tick(int note, float volume);
   void compute_scan_table();
   
@@ -65,11 +67,11 @@ public:
   float timestep;
   float sample_rate;
   float m_volume;
-  float release_stiffness;
-  float release_damping;
-  float mass_bias;
+  float mass_bias;  
   float damping_bias;
   float stiffness_bias;
+  float damping_adsr;
+  float stiffness_adsr;
   
   uint32_t k_;
   float *scan_table;
@@ -79,8 +81,14 @@ public:
   int *constrained_nodes;
   Vector3f *node_eq_pos;
   float restoring_stiffness;
-
-
+  
+  float attack_stiffness;
+  float attack_damping;
+  float attack_time;
+  
+  float release_stiffness;
+  float release_damping;
+  
   Vector3f *node_vel;
   Vector3f *node_acc;
 };

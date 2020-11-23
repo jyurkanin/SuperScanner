@@ -18,17 +18,24 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   is_window_open_ = 1;
   sim_mutex = 0;
   has_scan_update = 0;
-  release_flag = 0;
+  release_flag = 1;
   
   controller = Controller();
   controller.activate();
 
+  release_stiffness = .1;
   release_damping = .1;
-  release_stiffness = 1;
-
+  
+  attack_stiffness = 1;
+  attack_damping = .001;
+  
+  
   mass_bias = 0;
   damping_bias = 0;
   stiffness_bias = 0;
+
+  stiffness_adsr = 0;
+  damping_adsr = 0;
   
   scan_len = num_nodes; //create a linear network
   hammer_num = 0;
@@ -134,6 +141,25 @@ SuperScanner::~SuperScanner(){
   delete[] node_acc;
 }
 
+void SuperScanner::start_adsr(){
+  k_ = 0;
+  release_flag = 1;
+}
+
+void SuperScanner::get_adsr_gain(){
+  stiffness_adsr = 0;
+  damping_adsr = 0;
+  
+  if(k_ < (44100.0*attack_time)){
+    stiffness_adsr = attack_stiffness;
+    damping_adsr = attack_damping;
+  }
+  if(release_flag){
+    stiffness_adsr = release_stiffness;
+    damping_adsr = release_damping;
+  }
+}
+
 /* cases:
  * note is > 0 and !release : portamento to note
  * note is > 0 and release : play note, no portamento
@@ -144,24 +170,34 @@ float SuperScanner::tick(int note, float volume){
   static int was_released = 1;
   static float p_freq = 0;
   static uint32_t k_update = 0;
-
+  
   if(has_scan_update){
       k_update = k_;
       has_scan_update = 0;
   }
   
   float freq = 0;
+  
   if(note != -1){
       freq = (freqs[(note-21) % 12] * (1 << (1+(int)(note-21)/12)))/2;
+      p_freq = freq;
   }
-  
+  else{
+    return 0;
+  }
+
+  /*
   if((note != -1) && was_released){p_freq = freq;}
   else if((note != -1) && !was_released){p_freq += (freq - p_freq)/1000;}
+  else if((note == -1) && !was_released){
+    return 0;
+  }
+  */
   
   //  if((k_ % 10) == 0){
   //    log_file << freq << "," << p_freq << '\n';
   //  }
-
+  
   compute_scan_table();
   
   float idx = fmod(p_freq*k_*scan_len/sample_rate, scan_len);
@@ -206,6 +242,7 @@ void SuperScanner::simulate(){
     Vector3f k2[num_nodes*2];
     Vector3f k3[num_nodes*2];
     Vector3f k4[num_nodes*2];
+
     
     while(is_window_open_){
         unsigned int usecs = 1000;
@@ -271,6 +308,7 @@ void SuperScanner::simulate(){
         end = start;
         
     }
+    
     printf("Scanner dead\n");
 }
 
@@ -286,24 +324,20 @@ void SuperScanner::ODE(Vector3f *X, Vector3f *Xd){
   
   Vector3f d_pos[num_nodes];
   float d_pos_norm[num_nodes];
-
-
+  
   
   Vector3f eq_dist; //displacement from node eq. position.
   
+  
+  //get_adsr_gain();
+  
   //Let N be num_nodes
-  float stiffness_boost = stiffness_bias;
-  float damping_boost = damping_bias;
-  if(release_flag){
-    stiffness_boost = release_stiffness;
-    damping_boost = release_damping;
-  }
   
   for(int i = 0; i < num_nodes; i++){
     //N restoring forces and damping.
     eq_dist = node_eq_pos[i] - X[i];
-    F_restore = eq_dist*(.5*(stiffness_boost + restoring_stiffness)*eq_dist.norm());
-    F_damping = -X[num_nodes+i]*(damping_boost + (node_damping[i]/100.0)); //N damping forces.
+    F_restore = eq_dist*(.5*(stiffness_adsr + stiffness_bias + restoring_stiffness)*eq_dist.norm());
+    F_damping = -X[num_nodes+i]*(damping_adsr + damping_bias + (node_damping[i]/100.0)); //N damping forces.
 
     //N^2 Stuff.
     F_spring[0] = 0;
@@ -347,7 +381,6 @@ void SuperScanner::release(){
 }
 
 void SuperScanner::strike(){
-  k_= 0;
   release_flag = 0;
   sim_mutex = 1;
   for(int i = 0; i < scan_len; i++){

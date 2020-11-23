@@ -44,7 +44,6 @@ SuperScanner Todo List
   threading and race conditions. Ignoring for now.
   It was an issue with setting positions to 0 during strike().
   
-
 * DONE Mono Visualization
   Easy
 * TODO Gui Features
@@ -79,7 +78,7 @@ SuperScanner Todo List
    Print out the possible commands at the home screen.
 * DONE Rotate Viewer
   Easy.
-* TODO Panning Rotating Viewer
+* DONE Panning Rotating Viewer
   Panning rotating view? Ooh, map it to a button. Easy.
 * DONE 2D Visualize Scan Path
   This would be easy so I'm not really worried about it.
@@ -105,13 +104,29 @@ Hard:
   This will be tough.
 * DONE Map strikes to piano pedal.
   So note can ring out as frequency changes leading to a cool effect.
+  This has changed the whole project's vibe and led to a cool
+  innovation I think. Also do the release only iff pedal is released.
 * TODO ADSR. 
-  Color of scanner changes with ADSR gain.
-  Would be cool.
-* TODO Higher Order Interpolation in Tick.
+  Color of scanner changes with ADSR gain. Fucking genius.
+  Would be cool. Possibly use damping and stiffness to implement
+  adsr instead of just boring gain. Will Fucking Do.
+
+* Possible frequency domain shit.
+  What if scan path was mapped to the gains
+  of harmonic sinusoidal components? Hmm.
+  Result is cool modulated additive synthesis.
+* Higher Order Interpolation in Tick.
   Lead to smoother waveforms. Or just fucking low pass the wave maybe. IDK.
+  Actually, Probably not necessary to implement this. I don't think it would
+  achieve very much.
+* Optimizations
+  Replace Stiffness Matrix with an eigen matrix. Do direct matrix multiply
+  instead of using for loops. COuld lead to better vectorization.
 * Known bugs:
-With RK4, something weird is happening and not every strike gets counted.
-//Sometimes hangs on exit.
-//Weird segfault and memory corruption.
-Viewer has fisheye distortion going on.
+  With RK4, something weird is happening and not every strike gets counted.
+//weird bug. Lots of static.
+  //Getting weird pew-pew sounds when I press different notes. Portamento is the culprit I assume. It had to do with reseting k_ after each note change. No idea why this has to be reset.
+  //Sometimes hangs on exit.
+  //Weird segfault and memory corruption.
+  //weird segfault. Went away when I fixeed a function that returned non null with no return statement.
+  Viewer has fisheye distortion going on.
