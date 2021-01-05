@@ -23,10 +23,10 @@ public:
   
   void release();
   void strike();
-  void start_adsr();
-  void get_adsr_gain();
   float tick(int note, float volume);
   void compute_scan_table();
+  float get_adsr_gain();
+  void startNote();
   
   void setHammer(int num);
   
@@ -50,28 +50,32 @@ public:
   int *scan_path;
   int *node_damping;
   int *node_mass;
+  
+  
 //private:
   static void* simulate_wrapper(void*);
   void simulate();
   void ODE(Vector3f *X, Vector3f *Xd);
+  void solveRungeKutta(Vector3f *X, Vector3f *X1);
+  void solveForwardEuler(Vector3f *X, Vector3f *X1);
   
   float freqs[12] = {27.5, 29.135, 30.868, 32.703, 34.648, 36.708, 38.891, 41.203, 43.654, 46.249, 48.999, 51.913}; // frequencies of the lowest octave
   Controller controller;
   
   pthread_t scan_thread;
-
+  
   std::ofstream log_file;
   
   volatile int release_flag;
   int hammer_num;
   float timestep;
-  float sample_rate;
+  int sample_rate;
   float m_volume;
-  float mass_bias;  
+  float release_stiffness;
+  float release_damping;
+  float mass_bias;
   float damping_bias;
   float stiffness_bias;
-  float damping_adsr;
-  float stiffness_adsr;
   
   uint32_t k_;
   float *scan_table;
@@ -81,14 +85,27 @@ public:
   int *constrained_nodes;
   Vector3f *node_eq_pos;
   float restoring_stiffness;
+  int scan_method;
   
-  float attack_stiffness;
-  float attack_damping;
-  float attack_time;
+  int pad_mode;
+
+  const unsigned adsr_table_len = 12;
+  Vector2f *adsr_table;
+  unsigned adsr_state;
+  float adsr_gain;
+  unsigned state_before_release;
+  unsigned release_k;
   
-  float release_stiffness;
-  float release_damping;
+  Vector3f origin;
+  Vector3f scanner_rot;
   
   Vector3f *node_vel;
   Vector3f *node_acc;
+  
+  Vector3f *rk4_temp;
+  Vector3f *k1;
+  Vector3f *k2;
+  Vector3f *k3;
+  Vector3f *k4;
+
 };

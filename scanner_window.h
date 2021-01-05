@@ -33,6 +33,11 @@
 #define SCANNER_2D_MENU 5
 #define CONSTRAINT_MENU 6
 #define EQ_POS_MENU 7
+#define INFO_MENU 8
+#define ADSR_MENU 9
+
+
+//xdrawstring character width is 6 pixels. height I think is 8
 
 
 using namespace Eigen;
@@ -75,9 +80,10 @@ void del_window();
 void* window_thread(void*);
 
 
-void draw_scanner(Display *dpy, Window w, GC gc);
+void draw_scanner(Display *dpy, Window w, GC gc, int mono);
 void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono);
 
+void handle_adsr_menu(Display *dpy, Window w, GC gc, int &menu_id);
 void handle_eq_pos_menu(Display *dpy, Window w, GC gc, int &node_sel_x, int &node_sel_y, int &menu_id);
 void handle_scanner_2d_menu(Display *dpy, Window w, GC gc, int &menu_id);
 void handle_connectivity_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel_x, int &node_sel_y);
@@ -86,8 +92,9 @@ void handle_scan_path_menu(Display *dpy, Window w, GC gc, int &menu_id, int &nod
 void handle_node_damping_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
 void handle_node_constraint_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
 void handle_scanner_node_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel, int *params, int max);
+void handle_info_menu(Display *dpy, Window w, GC gc, int &menu_id);
 
-
+void draw_adsr_menu(Display *dpy, Window w, GC gc, int node_sel_x);
 void draw_eq_pos_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_sel_y);
 void draw_scanner_2d_menu(Display *dpy, Window w, GC gc);
 void draw_connectivity_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_sel_y);
@@ -96,8 +103,12 @@ void draw_node_mass_menu(Display *dpy, Window w, GC gc, int node_sel);
 void draw_node_damping_menu(Display *dpy, Window w, GC gc, int node_sel);
 void draw_node_constraint_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel);
 void draw_scanner_node_menu(Display *dpy, Window w, GC gc, int node_sel, int *params);
+void draw_info_menu(Display *dpy, Window w, GC gc);
+
+void print_keybindings();
 
 
+void draw_float(Display *dpy, Window w, GC gc, int x, int y, float num, int decimals);
 void draw_node_labels(Vector3f *node_pos, int num_nodes);
 void draw_text_boxes(int * params);
 void draw_select_box(int node_sel);
@@ -105,6 +116,7 @@ void draw_select_box(int node_sel);
 int rainbow(int c);
 Matrix3f get_rotation(float x, float y, float z);
 int get_num();
+float get_adsr_color_scalar();
 
 ProjectedStereoPoints project_stereo_point(Vector3f point_v, Vector3f view_v);
 StereoPixels projection_to_stereo_pixels(ProjectedStereoPoints pp);

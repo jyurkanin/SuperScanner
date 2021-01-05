@@ -12,11 +12,14 @@ static SuperScanner *scanner;
 
 void breakerbreaker(){}
 
-Vector3f origin = {-8,3.5,0};
+Vector3f scanner_rot = {0,0,0};
+Vector3f origin = {0,0,0};
 float viewer_angle = 0;
 float d_angle = 0;
 
-
+float get_adsr_color_scalar(){
+    return 1 - (scanner->adsr_gain/4);
+}
 
 int get_num(){ //read the keyboard for a number
     XEvent e;
@@ -42,6 +45,108 @@ int get_num(){ //read the keyboard for a number
     return ret;
 }
 
+void draw_float(Display *dpy, Window w, GC gc, int x, int y, float num, int decimals){
+    char number[10];
+    sprintf(number, "%.3f", num);
+    XDrawString(dpy, w, gc, x, y, number, strlen(number));
+}
+
+void print_keybindings(){
+    int num_keys = 14; //number of elements in following array.
+    const char *help_msg[] = {
+        "? - Keybinding List",
+        "m - toggle mono/stereo view",
+        "s - Edit scan Path",
+        "n - Mass Table",
+        "d - Damping Table",
+        "c - Connectivity Menu",
+        "p - Pause simulation",
+        "r - Resume simulation",
+        "x - exit",
+        "v - View scan table in 2D",
+        "o - Edit constrained Nodes",
+        "l - Edit equilibrium position table",
+        "y - Rotate viewer",
+        "i - info screen",
+        "a - envelope screen"
+    };
+    for(int i = 0; i < num_keys; i++){
+        XDrawString(dpy, w, gc, 180, 20+(i*16), help_msg[i], strlen(help_msg[i]));
+    }
+    get_num(); //wait for enter.
+}
+
+
+void draw_adsr_menu(Display *dpy, Window w, GC gc, int node_sel_x){
+    int num_divs = 8;
+    XSegment segs[num_divs];
+    unsigned first_release_state = 1 + floorf(scanner->adsr_table_len*.75);
+    
+    for(int i = 1; i < num_divs; i++){
+        segs[i-1].y1 = SCREEN_HEIGHT*(i/(float)num_divs);
+        segs[i-1].y2 = segs[i-1].y1;
+        segs[i-1].x1 = 0;
+        segs[i-1].x2 = SCREEN_WIDTH;
+    }
+    
+    segs[num_divs-1].y1 = 0;
+    segs[num_divs-1].y2 = SCREEN_HEIGHT;
+    segs[num_divs-1].x1 = SCREEN_WIDTH*scanner->adsr_table[first_release_state][0];
+    segs[num_divs-1].x2 = SCREEN_WIDTH*scanner->adsr_table[first_release_state][0];
+    
+    XPoint points[scanner->adsr_table_len];
+    for(int i = 0; i < scanner->adsr_table_len; i++){
+        points[i].x = SCREEN_WIDTH*scanner->adsr_table[i][0];
+        points[i].y = SCREEN_HEIGHT*(1-scanner->adsr_table[i][1]);
+    }
+
+    XSetForeground(dpy, gc, 0xFF0000);
+    XDrawSegments(dpy, w, gc, segs, num_divs-1);
+    XSetForeground(dpy, gc, 0xFFFF00);
+    XDrawSegments(dpy, w, gc, &segs[num_divs-1], 1);
+    XSetForeground(dpy, gc, 0xFF);
+    XDrawLines(dpy, w, gc, points, scanner->adsr_table_len, CoordModeOrigin);
+    XSetForeground(dpy, gc, 0xFF00);
+    XFillArc(dpy, w, gc, scanner->adsr_table[node_sel_x][0]*SCREEN_WIDTH, SCREEN_HEIGHT*(1 - scanner->adsr_table[node_sel_x][1]), 3, 3, 0, 360*64);
+}
+
+void handle_adsr_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel_x){
+    XEvent e;
+    KeySym ks = 0;
+    char buf[2];
+    
+    if(XPending(dpy) > 0){
+        XNextEvent(dpy, &e);
+        switch(e.type){
+        case KeyPress:
+            XLookupString(&e.xkey, buf, 1, &ks, NULL);
+            switch(buf[0]){
+            case 'x':
+                menu_id = SCANNER_3D_MENU;
+                break;
+            }
+            switch(XLookupKeysym(&e.xkey, 0)){
+            case XK_Left:
+                node_sel_x = std::max(1, node_sel_x-1); //I like this function.
+                break;
+            case XK_Right:
+                node_sel_x = std::min((int)scanner->adsr_table_len-2, node_sel_x+1); //me gusta
+                break;
+            }
+            break;
+        case ButtonPress:
+            switch(e.xbutton.button){
+            case 1: //left mouse button clicked
+                //printf("CLICK\n");
+                scanner->adsr_table[node_sel_x][0] = e.xbutton.x_root/(float)SCREEN_WIDTH;
+                scanner->adsr_table[node_sel_x][1] = 1 - (e.xbutton.y_root/(float)SCREEN_HEIGHT);
+                node_sel_x = std::min((int)scanner->adsr_table_len-2, node_sel_x+1); //me gusta
+                break;
+            }
+            break;
+        }
+    }
+}
 
 
 void handle_scanner_2d_menu(Display *dpy, Window w, GC gc, int &menu_id){
@@ -68,12 +173,13 @@ void draw_scanner_2d_menu(Display *dpy, Window w, GC gc){
     XSegment scan_segs[scanner->scan_len];
     for(int i = 0; i < scanner->scan_len-1; i++){
         scan_segs[i].x1 = i*interval_x;
-        scan_segs[i].y1 = (SCREEN_HEIGHT/2) + scanner->node_pos[i][2]*50;
+        scan_segs[i].y1 = (SCREEN_HEIGHT/2) + scanner->scan_table[i]*50;
         scan_segs[i].x2 = (i+1)*interval_x;
-        scan_segs[i].y2 = (SCREEN_HEIGHT/2) + scanner->node_pos[i+1][2]*50;
+        scan_segs[i].y2 = (SCREEN_HEIGHT/2) + scanner->scan_table[i+1]*50;
     }
 
-    XSetForeground(dpy, gc, 0xFF0000);
+    float scalar = get_adsr_color_scalar();
+    XSetForeground(dpy, gc, 0xFF0000*scalar);
     XDrawSegments(dpy, w, gc, scan_segs, scanner->scan_len);
 }
 
@@ -85,9 +191,7 @@ void draw_connectivity_menu(Display *dpy, Window w, GC gc, int node_sel_x, int n
   float interval_y = (SCREEN_HEIGHT-(offset_y*2))/((float)scanner->num_nodes);
   
   XSegment grid_segs[(scanner->num_nodes + 1) * 2];
-
-  //breakerbreaker();
-  //rows. First row doesnt follow pattern.
+  
   grid_segs[0].x1 = offset_x;
   grid_segs[0].y1 = offset_y;
   grid_segs[0].x2 = SCREEN_WIDTH-offset_x;
@@ -171,49 +275,49 @@ void handle_connectivity_menu(Display *dpy, Window w, GC gc, int &menu_id, int &
   
   
   if(XPending(dpy) > 0){
-    XNextEvent(dpy, &e);
-    if(e.type == KeyPress){
-      XLookupString(&e.xkey, buf, 1, &ks, NULL);
+      XNextEvent(dpy, &e);
+      if(e.type == KeyPress){
+          XLookupString(&e.xkey, buf, 1, &ks, NULL);
 
-      if(isdigit(buf[0]) || (buf[0] == '.')){
-	number[count] = buf[0];
-	count++;
-      }
-      if(ks == 0xFF0D){
-	number[count] = 0;
-	sscanf(number, "%f", &parsed_num);
-	if(parsed_num < max_value){
-	  scanner->stiffness_matrix[(node_sel_y*scanner->num_nodes) + node_sel_x] = parsed_num; //have to get the index at the opposite side of the diagonal too.
-	  scanner->stiffness_matrix[(node_sel_x*scanner->num_nodes) + node_sel_y] = parsed_num; //maintain symmetric constrain
-	}
-	count = 0;
-      }
+          if(isdigit(buf[0]) || (buf[0] == '.')){
+              number[count] = buf[0];
+              count++;
+          }
+          if(ks == 0xFF0D){
+              number[count] = 0;
+              sscanf(number, "%f", &parsed_num);
+              if(parsed_num < max_value){
+                  scanner->stiffness_matrix[(node_sel_y*scanner->num_nodes) + node_sel_x] = parsed_num; //have to get the index at the opposite side of the diagonal too.
+                  scanner->stiffness_matrix[(node_sel_x*scanner->num_nodes) + node_sel_y] = parsed_num; //maintain symmetric constrain
+              }
+              count = 0;
+          }
       
-      switch(buf[0]){
-      case 'x':
-	scanner->sim_mutex = 0;
-	menu_id = SCANNER_3D_MENU;
-	break;
+          switch(buf[0]){
+          case 'x':
+              scanner->sim_mutex = 0;
+              menu_id = SCANNER_3D_MENU;
+              break;
+          }
+          switch(XLookupKeysym(&e.xkey, 0)){
+          case XK_Left:
+              node_sel_x = std::max(node_sel_y+1, node_sel_x-1); //I like this function.
+              count = 0;
+              break;
+          case XK_Right:
+              node_sel_x = std::min(scanner->num_nodes-1, node_sel_x+1); //me gusta
+              count = 0;
+              break;
+          case XK_Down:
+              node_sel_y = std::min(node_sel_x-1, node_sel_y+1); //me gusta
+              count = 0;
+              break;
+          case XK_Up:
+              node_sel_y = std::max(0, node_sel_y-1); //I like this function.
+              count = 0;
+              break;
+          }
       }
-      switch(XLookupKeysym(&e.xkey, 0)){
-      case XK_Left:
-	node_sel_x = std::max(node_sel_y+1, node_sel_x-1); //I like this function.
-	count = 0;
-	break;
-      case XK_Right:
-	node_sel_x = std::min(scanner->num_nodes-1, node_sel_x+1); //me gusta
-	count = 0;
-	break;
-      case XK_Down:
-	node_sel_y = std::min(node_sel_x-1, node_sel_y+1); //me gusta
-	count = 0;
-	break;
-      case XK_Up:
-	node_sel_y = std::max(0, node_sel_y-1); //I like this function.
-	count = 0;
-	break;
-      }
-    }
   }  
 }
 
@@ -228,27 +332,33 @@ void draw_scanner(Display *dpy, Window w, GC gc, int mono){
   Vector3f end[1+(num_nodes*num_nodes/2)];
   Vector3f node_pos_rot[scanner->num_nodes];
   
-  Matrix3f rot = get_rotation(0, viewer_angle, 0);
+  Matrix3f rot = get_rotation(scanner_rot[0], scanner_rot[1]+viewer_angle, scanner_rot[2]);
   viewer_angle += d_angle;
   
   for(int i = 0; i < num_nodes; i++){ //row
-    node_pos_rot[i] = rot*scanner->node_pos[i];
-    for(int j = i; j < num_nodes; j++){ //column. //searches only upper Triangluar part.
-      if(scanner->stiffness_matrix[(i*num_nodes)+j] > 0){ //connection exists. Add to list.
-	start[actual_len] = rot*scanner->node_pos[i];
-	end[actual_len] = rot*scanner->node_pos[j];
-	actual_len++;
+      node_pos_rot[i] = rot*scanner->node_pos[i];
+      for(int j = i; j < num_nodes; j++){ //column. //searches only upper Triangluar part.
+          if(scanner->stiffness_matrix[(i*num_nodes)+j] > 0){ //connection exists. Add to list.
+              start[actual_len] = rot*scanner->node_pos[i];
+              end[actual_len] = rot*scanner->node_pos[j];
+              actual_len++;
+          }
       }
-    }
   }
 
+  float scalar = get_adsr_color_scalar();
+  
   if(mono){
-    draw_mono_lines(start, end, actual_len);
-    draw_mono_points(node_pos_rot, num_nodes);
+      XSetForeground(dpy, gc, 0xFF0000*scalar);
+      draw_mono_lines(start, end, actual_len);
+      XSetForeground(dpy, gc, 0xFF);
+      draw_mono_points(node_pos_rot, num_nodes);
   }
   else{
-    draw_stereo_lines(start, end, actual_len);
-    draw_stereo_points(node_pos_rot, num_nodes);
+      XSetForeground(dpy, gc, 0xFF0000*scalar);
+      draw_stereo_lines(start, end, actual_len);
+      XSetForeground(dpy, gc, 0xFF);
+      draw_stereo_points(node_pos_rot, num_nodes);
   }
 }
 
@@ -311,7 +421,15 @@ void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono)
                     d_angle = -.01;
                 else
                     d_angle = 0;
-                        
+                break;
+            case 'i':
+                menu_id = INFO_MENU;
+                break;
+            case 'a':
+                menu_id = ADSR_MENU;
+                break;
+            case '?':
+                print_keybindings();
                 break;
             }
             
@@ -343,7 +461,7 @@ void draw_eq_pos_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_se
     Vector3f end[1+(num_nodes*num_nodes/2)];
     Vector3f node_pos_rot[scanner->num_nodes];
     
-    Matrix3f rot = get_rotation(0, viewer_angle, 0);
+    Matrix3f rot = get_rotation(scanner_rot[0], scanner_rot[1] + viewer_angle, scanner_rot[2]);
     viewer_angle += d_angle;
   
     for(int i = 0; i < num_nodes; i++){ //row
@@ -357,7 +475,9 @@ void draw_eq_pos_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_se
         }
     }
     
+    XSetForeground(dpy, gc, 0xFF0000);
     draw_mono_lines(start, end, actual_len);
+    XSetForeground(dpy, gc, 0xFF00);
     draw_node_labels(node_pos_rot, num_nodes);
 
     
@@ -429,21 +549,23 @@ void draw_scanner_node_menu(Display *dpy, Window w, GC gc, int node_sel, int *pa
   Vector3f end[1+(num_nodes*num_nodes/2)];
   Vector3f node_pos_rot[scanner->num_nodes];
   
-  Matrix3f rot = get_rotation(0, viewer_angle, 0);
+  Matrix3f rot = get_rotation(scanner_rot[0], scanner_rot[1] + viewer_angle, scanner_rot[2]);
   viewer_angle += d_angle;
   
   for(int i = 0; i < num_nodes; i++){ //row
     node_pos_rot[i] = rot*scanner->node_pos[i];
     for(int j = i; j < num_nodes; j++){ //column. //searches only upper Triangluar part.
       if(scanner->stiffness_matrix[(i*num_nodes)+j] > 0){ //connection exists. Add to list.
-	start[actual_len] = rot*scanner->node_pos[i];
-	end[actual_len] = rot*scanner->node_pos[j];
-	actual_len++;
+          start[actual_len] = rot*scanner->node_pos[i];
+          end[actual_len] = rot*scanner->node_pos[j];
+          actual_len++;
       }
     }
   }
-  
+
+  XSetForeground(dpy, gc, 0xFF0000);
   draw_mono_lines(start, end, actual_len);
+  XSetForeground(dpy, gc, 0xFF00);
   draw_node_labels(node_pos_rot, num_nodes);
 
   draw_text_boxes(params);
@@ -655,16 +777,262 @@ void handle_scanner_node_menu(Display *dpy, Window w, GC gc, int &menu_id, int &
   }
 }
 
+void handle_info_menu(Display *dpy, Window w, GC gc, int &menu_id){
+    XEvent e;
+    KeySym ks = 0;
+    char buf[2];
+    if(XPending(dpy) > 0){
+        XNextEvent(dpy, &e);
+        if(e.type == KeyPress){
+            XLookupString(&e.xkey, buf, 1, &ks, NULL);
+            switch(buf[0]){
+            case 'x':
+                menu_id = SCANNER_3D_MENU;
+                break;
+            }
+        }
+    }
+
+}
+
+void draw_info_menu(Display *dpy, Window w, GC gc){
+    draw_scanner(dpy, w, gc, 1); //nice.
+    
+    const int num_segments = 28;
+    XSegment segments[num_segments];
+
+    XSetForeground(dpy, gc, 0xFF);
+
+    int pos_table_x = 100;
+    int pos_table_y = SCREEN_HEIGHT - 120;
+    int pos_table_height = 36;
+    int pos_table_width = 140;
+    //this is the position and orientation table.
+    //top rectangle.
+    segments[0].x1 = pos_table_x;
+    segments[0].y1 = pos_table_y;
+    segments[0].x2 = pos_table_x + pos_table_width;
+    segments[0].y2 = pos_table_y;
+
+    segments[1].x1 = pos_table_x + pos_table_width;
+    segments[1].y1 = pos_table_y;
+    segments[1].x2 = pos_table_x + pos_table_width;
+    segments[1].y2 = pos_table_y + 13+12+pos_table_height;
+        
+    segments[2].x1 = pos_table_x;
+    segments[2].y1 = pos_table_y + 13;
+    segments[2].x2 = pos_table_x + pos_table_width;
+    segments[2].y2 = pos_table_y + 13;
+    
+    segments[3].x1 = pos_table_x;
+    segments[3].y1 = pos_table_y;
+    segments[3].x2 = pos_table_x;
+    segments[3].y2 = pos_table_y + 13+12+pos_table_height;
+
+    segments[4].x1 = pos_table_x - 10;
+    segments[4].y1 = pos_table_y + 13 + 12;
+    segments[4].x2 = pos_table_x - 10;
+    segments[4].y2 = pos_table_y + 13+12+pos_table_height;
+
+    segments[5].x1 = pos_table_x - 10;
+    segments[5].y1 = pos_table_y + 13+12+pos_table_height;
+    segments[5].x2 = pos_table_x + pos_table_width;
+    segments[5].y2 = pos_table_y + 13+12+pos_table_height;
+
+    segments[6].x1 = pos_table_x - 10;
+    segments[6].y1 = pos_table_y + 13 + 12+(pos_table_height/3);
+    segments[6].x2 = pos_table_x + pos_table_width;
+    segments[6].y2 = pos_table_y + 13 + 12+(pos_table_height/3);
+
+    segments[7].x1 = pos_table_x - 10;
+    segments[7].y1 = pos_table_y + 13 + 12+(2*pos_table_height/3);
+    segments[7].x2 = pos_table_x + pos_table_width;
+    segments[7].y2 = pos_table_y + 13 + 12+(2*pos_table_height/3);
+
+    segments[8].x1 = pos_table_x - 10;
+    segments[8].y1 = pos_table_y + 13+12;
+    segments[8].x2 = pos_table_x + pos_table_width;
+    segments[8].y2 = pos_table_y + 13+12;
+
+    segments[9].x1 = pos_table_x + (pos_table_width/2);
+    segments[9].y1 = pos_table_y + 13;
+    segments[9].x2 = pos_table_x + (pos_table_width/2);
+    segments[9].y2 = pos_table_y + 13+12+pos_table_height;
+    
+    XDrawString(dpy, w, gc, pos_table_x + (pos_table_width/2) - (72/2), SCREEN_HEIGHT - 109, "Camera Frame", 12);
+    XDrawString(dpy, w, gc, pos_table_x + (pos_table_width/4) - (48/2), pos_table_y + 13+11, "Position", 8);
+    XDrawString(dpy, w, gc, pos_table_x + (3*pos_table_width/4) - (48/2), pos_table_y + 13+11, "Rotation", 8);
+    XDrawString(dpy, w, gc, pos_table_x - 10 + 3, pos_table_y + 13+12-1 + (pos_table_height/3), "X", 1);
+    XDrawString(dpy, w, gc, pos_table_x - 10 + 3, pos_table_y + 13+12-1 + (2*pos_table_height/3), "Y", 1);
+    XDrawString(dpy, w, gc, pos_table_x - 10 + 3, pos_table_y + 13+12-1 + pos_table_height, "Z", 1);
+    
+    draw_float(dpy, w, gc, pos_table_x+8, pos_table_y + 13+12-1 + (pos_table_height/3), origin[0], 2);
+    draw_float(dpy, w, gc, pos_table_x+8, pos_table_y + 13+12-1 + (2*pos_table_height/3), origin[1], 2);
+    draw_float(dpy, w, gc, pos_table_x+8, pos_table_y + 13+12-1 + pos_table_height, origin[2], 2);
+    
+    draw_float(dpy, w, gc, pos_table_x+8+(pos_table_width/2), pos_table_y + 13+12-1 + (pos_table_height/3), scanner_rot[0], 2);
+    draw_float(dpy, w, gc, pos_table_x+8+(pos_table_width/2), pos_table_y + 13+12-1 + (2*pos_table_height/3), scanner_rot[1], 2);
+    draw_float(dpy, w, gc, pos_table_x+8+(pos_table_width/2), pos_table_y + 13+12-1 + pos_table_height, scanner_rot[2], 2);
+    
+    int bias_table_x = 300;
+    int bias_table_y = pos_table_y;
+    int bias_table_width = 400;
+    int bias_table_height = 24;
+    
+    segments[10].x1 = bias_table_x;
+    segments[10].y1 = bias_table_y;
+    segments[10].x2 = bias_table_x + bias_table_width;
+    segments[10].y2 = bias_table_y;
+    
+    segments[11].x1 = bias_table_x + bias_table_width;
+    segments[11].y1 = bias_table_y;
+    segments[11].x2 = bias_table_x + bias_table_width;
+    segments[11].y2 = bias_table_y + 12 + bias_table_height;
+    
+    segments[12].x1 = bias_table_x + bias_table_width;
+    segments[12].y1 = bias_table_y + 12;
+    segments[12].x2 = bias_table_x;
+    segments[12].y2 = bias_table_y + 12;
+    
+    segments[13].x1 = bias_table_x;
+    segments[13].y1 = bias_table_y + 12 + bias_table_height;
+    segments[13].x2 = bias_table_x;
+    segments[13].y2 = bias_table_y;
+
+    segments[14].x1 = bias_table_x;
+    segments[14].y1 = bias_table_y + 12 + bias_table_height;
+    segments[14].x2 = bias_table_x + bias_table_width;
+    segments[14].y2 = bias_table_y + 12 + bias_table_height;
+
+    segments[15].x1 = bias_table_x;
+    segments[15].y1 = bias_table_y + 12 + (bias_table_height/2);
+    segments[15].x2 = bias_table_x + bias_table_width;
+    segments[15].y2 = bias_table_y + 12 + (bias_table_height/2);
+
+    segments[16].x1 = bias_table_x + bias_table_width/2;
+    segments[16].y1 = bias_table_y;
+    segments[16].x2 = bias_table_x + bias_table_width/2;
+    segments[16].y2 = bias_table_y + 12;
+    
+    XDrawString(dpy, w, gc, bias_table_x + (bias_table_width*.25) - (4*6/2), bias_table_y + 11, "Bias", 4);
+    XDrawString(dpy, w, gc, bias_table_x + (bias_table_width*.75) - (7*6/2), bias_table_y + 11, "Release", 7);
+    
+    segments[17].x1 = bias_table_x + bias_table_width/6.0;
+    segments[17].y1 = bias_table_y + 12;
+    segments[17].x2 = bias_table_x + bias_table_width/6.0;
+    segments[17].y2 = bias_table_y + 12 + bias_table_height;
+    
+    segments[18].x1 = bias_table_x + 2*bias_table_width/6.0;
+    segments[18].y1 = bias_table_y + 12;
+    segments[18].x2 = bias_table_x + 2*bias_table_width/6.0;
+    segments[18].y2 = bias_table_y + 12 + bias_table_height;
+
+    segments[19].x1 = bias_table_x + 3*bias_table_width/6.0;
+    segments[19].y1 = bias_table_y + 12;
+    segments[19].x2 = bias_table_x + 3*bias_table_width/6.0;
+    segments[19].y2 = bias_table_y + 12 + bias_table_height;
+
+    segments[20].x1 = bias_table_x + bias_table_width*(.5+(1/4.0));
+    segments[20].y1 = bias_table_y + 12;
+    segments[20].x2 = bias_table_x + bias_table_width*(.5+(1/4.0));
+    segments[20].y2 = bias_table_y + 12 + bias_table_height;
+
+    
+    XDrawString(dpy, w, gc, bias_table_x + (0.5*bias_table_width/6.0) - (4*6/2), bias_table_y + 12+11, "Mass", 4);
+    XDrawString(dpy, w, gc, bias_table_x + (1.5*bias_table_width/6.0) - ((7*6)/2), bias_table_y + 12+11, "Damping", 7);
+    XDrawString(dpy, w, gc, bias_table_x + (2.5*bias_table_width/6.0) - ((9*6)/2), bias_table_y + 12+11, "Stiffness", 9);
+    
+    XDrawString(dpy, w, gc, bias_table_x + (bias_table_width*(.5+(0.5/4.0))) - ((7*6)/2), bias_table_y + 12+11, "Damping", 7);
+    XDrawString(dpy, w, gc, bias_table_x + (bias_table_width*(.5+(1.5/4.0))) - ((9*6)/2), bias_table_y + 12+11, "Stiffness", 9);
+
+    draw_float(dpy, w, gc, bias_table_x + (0.5*bias_table_width/6.0) - (4*6/2), bias_table_y + 24+11, scanner->mass_bias, 3);
+    draw_float(dpy, w, gc, bias_table_x + (1.5*bias_table_width/6.0) - ((7*6)/2), bias_table_y + 24+11, scanner->damping_bias, 3);
+    draw_float(dpy, w, gc, bias_table_x + (2.5*bias_table_width/6.0) - ((9*6)/2), bias_table_y + 24+11, scanner->stiffness_bias, 3);
+    
+    draw_float(dpy, w, gc, bias_table_x + (bias_table_width*(.5+(0.5/4.0))) - ((7*6)/2), bias_table_y + 24+11, scanner->release_damping, 3);
+    draw_float(dpy, w, gc, bias_table_x + (bias_table_width*(.5+(1.5/4.0))) - ((9*6)/2), bias_table_y + 24+11, scanner->release_stiffness, 3);
+
+    
+    int other_table_x = 740;
+    int other_table_y = pos_table_y;
+    int other_table_width = 360;
+    int other_table_height = 26;
+    
+    segments[21].x1 = other_table_x;
+    segments[21].y1 = other_table_y;
+    segments[21].x2 = other_table_x + other_table_width;
+    segments[21].y2 = other_table_y;
+
+    segments[22].x1 = other_table_x + other_table_width;
+    segments[22].y1 = other_table_y;
+    segments[22].x2 = other_table_x + other_table_width;
+    segments[22].y2 = other_table_y + other_table_height;
+    
+    segments[23].x1 = other_table_x;
+    segments[23].y1 = other_table_y;
+    segments[23].x2 = other_table_x;
+    segments[23].y2 = other_table_y + other_table_height;
+    
+    segments[24].x1 = other_table_x;
+    segments[24].y1 = other_table_y + other_table_height;
+    segments[24].x2 = other_table_x + other_table_width;
+    segments[24].y2 = other_table_y + other_table_height;
+
+    segments[25].x1 = other_table_x;
+    segments[25].y1 = other_table_y + other_table_height/2;
+    segments[25].x2 = other_table_x + other_table_width;
+    segments[25].y2 = other_table_y + other_table_height/2;
+    
+    segments[26].x1 = other_table_x + other_table_width/3;
+    segments[26].y1 = other_table_y;
+    segments[26].x2 = other_table_x + other_table_width/3;
+    segments[26].y2 = other_table_y + other_table_height;
+
+    segments[27].x1 = other_table_x + 2*other_table_width/3;
+    segments[27].y1 = other_table_y;
+    segments[27].x2 = other_table_x + 2*other_table_width/3;
+    segments[27].y2 = other_table_y + other_table_height;
+
+    XDrawString(dpy, w, gc, other_table_x + (other_table_width*(0.5/3.0)) - ((6*6)/2), other_table_y + 11, "Volume", 6);
+    XDrawString(dpy, w, gc, other_table_x + (other_table_width*(1.5/3.0)) - ((6*6)/2), other_table_y + 11, "Hammer", 6);
+    XDrawString(dpy, w, gc, other_table_x + (other_table_width*(2.5/3.0)) - ((19*6)/2), other_table_y + 11, "Restoring Stiffness", 19);
+    
+    draw_float(dpy, w, gc, other_table_x + (other_table_width*(0.5/3.0)) - ((6*6)/2), other_table_y + 24, scanner->m_volume, 3);
+    draw_float(dpy, w, gc, other_table_x + (other_table_width*(1.5/3.0)) - ((6*6)/2), other_table_y + 24, scanner->hammer_num, 3);
+    draw_float(dpy, w, gc, other_table_x + (other_table_width*(2.5/3.0)) - ((19*6)/2), other_table_y + 24, scanner->restoring_stiffness, 3);
+    
+    XDrawSegments(dpy, w, gc, segments, num_segments);
+    
+    int select = scanner->scan_method/10;
+    switch(select){
+    case 0:
+        XDrawString(dpy, w, gc, 1120, other_table_y, "Scan Path Method: Z Pos", 23);
+        break;
+    case 1:
+        XDrawString(dpy, w, gc, 1120, other_table_y, "Scan Path Method: Displacement Norm", 35);
+        break;
+    case 2:
+        XDrawString(dpy, w, gc, 1120, other_table_y, "Scan Path Method: Displacement Sum", 34);
+        break;
+    }
+
+    if(scanner->pad_mode){
+        XDrawString(dpy, w, gc, 1120, other_table_y+10, "Pad Mode On", 11);
+    }
+    else{
+        XDrawString(dpy, w, gc, 1120, other_table_y+10, "Pad Mode Off", 12);
+    }
+}
 
 
 void* window_thread(void*){
   int menu_id = SCANNER_3D_MENU;
   int mono = 1;
   int node_sel = 0;
-
+  
   int node_sel_x = 0; //Connectivity matrix
   int node_sel_y = 0;
-
+  
   int flag = 0;
   
   XSetBackground(dpy, gc, 0);
@@ -672,35 +1040,40 @@ void* window_thread(void*){
     XClearWindow(dpy, w);
     switch(menu_id){
     case SCANNER_3D_MENU: //Main Menu Section=============================================
-      draw_scanner(dpy, w, gc, mono);
-      handle_scanner_menu(dpy, w, gc, menu_id, mono);
-      flag = 1;
-      break;
+        draw_scanner(dpy, w, gc, mono);
+        handle_scanner_menu(dpy, w, gc, menu_id, mono);
+        flag = 1;
+        break;
     case SCAN_PATH_MENU: //Scan Path Selection Menu=================================
-      draw_scan_path_menu(dpy, w, gc, node_sel);
-      handle_scan_path_menu(dpy, w, gc, menu_id, node_sel);
-      break;
+        draw_scan_path_menu(dpy, w, gc, node_sel);
+        handle_scan_path_menu(dpy, w, gc, menu_id, node_sel);
+        break;
     case NODE_MASS_MENU: //Node Mass Menu=================================
-      draw_node_mass_menu(dpy, w, gc, node_sel);
-      handle_node_mass_menu(dpy, w, gc, menu_id, node_sel);
-      break;
+        draw_node_mass_menu(dpy, w, gc, node_sel);
+        handle_node_mass_menu(dpy, w, gc, menu_id, node_sel);
+        break;
     case NODE_DAMPING_MENU: //Node Mass Menu=================================
-      draw_node_damping_menu(dpy, w, gc, node_sel);
-      handle_node_damping_menu(dpy, w, gc, menu_id, node_sel);
-      break;
+        draw_node_damping_menu(dpy, w, gc, node_sel);
+        handle_node_damping_menu(dpy, w, gc, menu_id, node_sel);
+        break;
     case CONNECTIVITY_MENU: //Connection Matrix Menu=================================
-      draw_connectivity_menu(dpy, w, gc, node_sel_x, node_sel_y);
-      handle_connectivity_menu(dpy, w, gc, menu_id, node_sel_x, node_sel_y);
-      break;
-    case SCANNER_2D_MENU: //Connection Matrix Menu=================================
-      draw_scanner_2d_menu(dpy, w, gc);
-      handle_scanner_2d_menu(dpy, w, gc, menu_id);
-      break;
-    case CONSTRAINT_MENU: //Connection Matrix Menu=================================
+        if(flag){
+            node_sel_x = 0;
+            node_sel_y = 0;
+            flag = 0;
+        }
+        draw_connectivity_menu(dpy, w, gc, node_sel_x, node_sel_y);
+        handle_connectivity_menu(dpy, w, gc, menu_id, node_sel_x, node_sel_y);
+        break;
+    case SCANNER_2D_MENU:
+        draw_scanner_2d_menu(dpy, w, gc);
+        handle_scanner_2d_menu(dpy, w, gc, menu_id);
+        break;
+    case CONSTRAINT_MENU:
         draw_node_constraint_menu(dpy, w, gc, node_sel);
         handle_node_constraint_menu(dpy, w, gc, menu_id, node_sel);
         break;
-    case EQ_POS_MENU: //Connection Matrix Menu=================================
+    case EQ_POS_MENU:
         if(flag){
             node_sel_x = 0;
             node_sel_y = 0;
@@ -708,11 +1081,26 @@ void* window_thread(void*){
         }
         draw_eq_pos_menu(dpy, w, gc, node_sel_x, node_sel_y);
         handle_eq_pos_menu(dpy, w, gc, node_sel_x, node_sel_y, menu_id);
-        break;     
+        break;
+    case INFO_MENU:
+        draw_info_menu(dpy, w, gc);
+        handle_info_menu(dpy, w, gc, menu_id);
+        break;
+    case ADSR_MENU:
+        if(flag){
+            node_sel_x = 1;
+            flag = 0;
+        }
+        draw_adsr_menu(dpy, w, gc, node_sel_x);
+        handle_adsr_menu(dpy, w, gc, menu_id, node_sel_x);
+        break;
     default: //Never get here. Pls.
-      break;
+        break;
     }
+    
     scanner->update_params();
+    origin = scanner->origin;
+    scanner_rot = scanner->scanner_rot;
     
     XFlush(dpy);
     usleep(10000); //update 100 times a second.
@@ -731,7 +1119,7 @@ void init_window(SuperScanner *s){
     Atom wm_fullscreen = XInternAtom (dpy, "_NET_WM_STATE_FULLSCREEN", true );
     XChangeProperty(dpy, w, wm_state, XA_ATOM, 32, PropModeReplace, (unsigned char *)&wm_fullscreen, 1);
     
-    XSelectInput(dpy, w, StructureNotifyMask | ExposureMask | KeyPressMask);
+    XSelectInput(dpy, w, StructureNotifyMask | ExposureMask | KeyPressMask | ButtonPressMask);
     XClearWindow(dpy, w);
     XMapWindow(dpy, w);
     gc = XCreateGC(dpy, w, 0, 0);
@@ -796,8 +1184,8 @@ void draw_node_labels(Vector3f *node_pos, int num_nodes){
 ProjectedPoint project_mono_point(Vector3f point_v, Vector3f view_v){
   ProjectedPoint pp;
   
-  pp.theta = atan2f(point_v[1] - view_v[1], point_v[0] - view_v[0]);
-  pp.phi = atan2f(point_v[2] - view_v[2], point_v[0] - view_v[0]);
+  pp.theta = (point_v[1] - view_v[1])/( point_v[0] - view_v[0]); //atan2f(point_v[1] - view_v[1], point_v[0] - view_v[0]);
+  pp.phi = (point_v[2] - view_v[2])/( point_v[0] - view_v[0]); //atan2f(point_v[2] - view_v[2], point_v[0] - view_v[0]);
 
   return pp;
 }
@@ -805,8 +1193,8 @@ ProjectedPoint project_mono_point(Vector3f point_v, Vector3f view_v){
 
 MonoPixel projection_to_mono_pixel(ProjectedPoint pp){
   MonoPixel mp;
-  float theta_max = M_PI*.7;
-  float phi_max = M_PI*.7;
+  float theta_max = 2;
+  float phi_max = 2;
 
   float scale_x = (SCREEN_WIDTH/2)/theta_max;
   float scale_y = (SCREEN_HEIGHT/2)/phi_max;
@@ -837,14 +1225,21 @@ void draw_mono_lines(Vector3f *start_point, Vector3f *end_point, int len){
     
     mp_start = projection_to_mono_pixel(pp_start);
     mp_end = projection_to_mono_pixel(pp_end);
-    
-    segments[i].x1 = mp_start.x;
-    segments[i].y1 = mp_start.y;
-    segments[i].x2 = mp_end.x;
-    segments[i].y2 = mp_end.y;
+
+    if((mp_start.x != -1) && (mp_end.x != -1) && ((start_point[i][0] - origin[0]) > 0) && ((end_point[i][0] - origin[0]) > 0)){
+        segments[i].x1 = mp_start.x;
+        segments[i].y1 = mp_start.y;
+        segments[i].x2 = mp_end.x;
+        segments[i].y2 = mp_end.y;
+    }
+    else{
+        segments[i].x1 = -1;
+        segments[i].y1 = -1;
+        segments[i].x2 = -1;
+        segments[i].y2 = -1;
+    }
   }
   
-  XSetForeground(dpy, gc, 0xFF0000);
   XDrawSegments(dpy, w, gc, segments, len);
 }
 
@@ -857,11 +1252,16 @@ void draw_mono_points(Vector3f *point, int len){
   for(int i = 0; i < len; i++){
     pp = project_mono_point(point[i], origin);
     mp = projection_to_mono_pixel(pp);
-    xpoints[i].x = mp.x;
-    xpoints[i].y = mp.y;
+    if((point[i][0] - origin[0]) > 0){
+        xpoints[i].x = mp.x;
+        xpoints[i].y = mp.y;        
+    }
+    else{
+        xpoints[i].x = -1;
+        xpoints[i].y = -1;
+    }
   }
 
-  XSetForeground(dpy, gc, 0xFF);
   XDrawPoints(dpy, w, gc, xpoints, len, CoordModeOrigin);  
 }
 
@@ -881,18 +1281,18 @@ ProjectedStereoPoints project_stereo_point(Vector3f point_v, Vector3f view_v){
     point.y = point_v[1];
     point.z = point_v[2];
     
-    pp.theta_l = atan2f(point.y - view.y, point.x - view.x);
-    pp.theta_r = atan2f(point.y - view.y - STEREO_DISPARITY, point.x - view.x);
-    pp.phi_l = atan2f(point.z - view.z, point.x - view.x);
-    pp.phi_r = atan2f(point.z - view.z, point.x - view.x);
+    pp.theta_l = (point.y - view.y)/(point.x - view.x);//atan2f(point.y - view.y, point.x - view.x);
+    pp.theta_r = (point.y - view.y - STEREO_DISPARITY)/(point.x - view.x); //atan2f(point.y - view.y - STEREO_DISPARITY, point.x - view.x);
+    pp.phi_l = (point.z - view.z)/(point.x - view.x); //atan2f(point.z - view.z, point.x - view.x);
+    pp.phi_r = (point.z - view.z)/(point.x - view.x); //atan2f(point.z - view.z, point.x - view.x);
 
     return pp;
 }
 
 StereoPixels projection_to_stereo_pixels(ProjectedStereoPoints pp){
     StereoPixels sp;
-    float theta_max = M_PI*.7;
-    float phi_max = M_PI*.7;
+    float theta_max = 2;
+    float phi_max = 2;
     float scale_x = (SCREEN_WIDTH/4)/theta_max;
     float scale_y = (SCREEN_HEIGHT/2)/phi_max;
 
@@ -930,21 +1330,33 @@ void draw_stereo_lines(Vector3f *start_point, Vector3f *end_point, int len){
     pp_end = project_stereo_point(end_point[i], origin);
     sp_start = projection_to_stereo_pixels(pp_start);
     sp_end = projection_to_stereo_pixels(pp_end);
-    
-    segments[2*i].x1 = sp_start.xl;
-    segments[2*i].y1 = sp_start.yl;
-    segments[2*i].x2 = sp_end.xl;
-    segments[2*i].y2 = sp_end.yl;
 
-    segments[(2*i)+1].x1 = sp_start.xr;
-    segments[(2*i)+1].y1 = sp_start.yr;
-    segments[(2*i)+1].x2 = sp_end.xr;
-    segments[(2*i)+1].y2 = sp_end.yr;
-
+    if((sp_start.xl != -1) && (sp_end.xl != -1) && (sp_start.xr != -1) && (sp_end.xr != -1) &&
+       ((start_point[i][0] - origin[0]) > 0) && ((end_point[i][0] - origin[0]) > 0)){
+        segments[2*i].x1 = sp_start.xl;
+        segments[2*i].y1 = sp_start.yl;
+        segments[2*i].x2 = sp_end.xl;
+        segments[2*i].y2 = sp_end.yl;
+        
+        segments[(2*i)+1].x1 = sp_start.xr;
+        segments[(2*i)+1].y1 = sp_start.yr;
+        segments[(2*i)+1].x2 = sp_end.xr;
+        segments[(2*i)+1].y2 = sp_end.yr;
+    }
+    else{
+        segments[2*i].x1 = -1;
+        segments[2*i].y1 = -1;
+        segments[2*i].x2 = -1;
+        segments[2*i].y2 = -1;
+        
+        segments[(2*i)+1].x1 = -1;
+        segments[(2*i)+1].y1 = -1;
+        segments[(2*i)+1].x2 = -1;
+        segments[(2*i)+1].y2 = -1;
+    }
     //    printf("Segment %d %d %d %d\n", segments[2*i].x1, segments[2*i].y1, segments[2*i].x2, segments[2*i].y2); //LEFTOFF
   }
   
-  XSetForeground(dpy, gc, 0xFF0000);
   XDrawSegments(dpy, w, gc, segments, 2*len);
 }
 
@@ -955,13 +1367,15 @@ void draw_stereo_points(Vector3f *points, int len){
   for(int i = 0; i < len; i++){
     pp = project_stereo_point(points[i], origin);
     sp = projection_to_stereo_pixels(pp);
-    xpoints[(2*i)].x = sp.xl;
-    xpoints[(2*i)].y = sp.yl;
-    xpoints[(2*i)+1].x = sp.xr;
-    xpoints[(2*i)+1].y = sp.yr;
+
+    if((points[i][0] - origin[0]) > 0){
+        xpoints[(2*i)].x = sp.xl;
+        xpoints[(2*i)].y = sp.yl;
+        xpoints[(2*i)+1].x = sp.xr;
+        xpoints[(2*i)+1].y = sp.yr;
+    }
   }
 
-  XSetForeground(dpy, gc, 0xFF);
   XDrawPoints(dpy, w, gc, xpoints, 2*len, CoordModeOrigin);
 }
 
@@ -974,24 +1388,28 @@ void draw_stereo_line(Vector3f start_point, Vector3f end_point){
     StereoPixels sp_start = projection_to_stereo_pixels(pp_start);
     StereoPixels sp_end = projection_to_stereo_pixels(pp_end);
 
-    if(!(sp_start.xl == -1 || sp_end.xl == -1))
-        XDrawLine(dpy, w, gc, sp_start.xl, sp_start.yl, sp_end.xl, sp_end.yl);
-    if(!(sp_start.xr == -1 || sp_end.xr == -1))
-        XDrawLine(dpy, w, gc, sp_start.xr, sp_start.yr, sp_end.xr, sp_end.yr);
+    if(((start_point[0] - origin[0]) > 0) && ((end_point[0] - origin[0]) > 0)){
+        if(!(sp_start.xl == -1 || sp_end.xl == -1))
+            XDrawLine(dpy, w, gc, sp_start.xl, sp_start.yl, sp_end.xl, sp_end.yl);
+        if(!(sp_start.xr == -1 || sp_end.xr == -1))
+            XDrawLine(dpy, w, gc, sp_start.xr, sp_start.yr, sp_end.xr, sp_end.yr);
+    }
 }
 
 void draw_stereo_point(Vector3f point){
     ProjectedStereoPoints pp = project_stereo_point(point, origin);
     StereoPixels sp = projection_to_stereo_pixels(pp);
-    XDrawPoint(dpy, w, gc, sp.xl, sp.yl);
-    XDrawPoint(dpy, w, gc, sp.xr, sp.yr);
+    if((point[0] - origin[0]) > 0){
+        XDrawPoint(dpy, w, gc, sp.xl, sp.yl);
+        XDrawPoint(dpy, w, gc, sp.xr, sp.yr);
+    }
 }
 
 void draw_stereo_sphere(Sphere sphere){
     ProjectedStereoPoints pp = project_stereo_point(sphere.pos, origin);
     StereoPixels sp = projection_to_stereo_pixels(pp);
     Vector3f temp(sphere.pos);
-    float radius_angle = atan2f(sphere.radius, temp.norm())*128;
+    float radius_angle = (sphere.radius)/(temp.norm())*128; //atan2f(sphere.radius, temp.norm())*128;
     XFillArc(dpy, w, gc, sp.xl, sp.yl, radius_angle, radius_angle, 0, 360*64);
     XFillArc(dpy, w, gc, sp.xr, sp.yr, radius_angle, radius_angle, 0, 360*64);
 }

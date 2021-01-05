@@ -118,70 +118,70 @@ int Controller::has_new_data(){
 }
 
 void *Controller::read_controller(void *nothing){
-  unsigned char packet[4];
-  has_new = 1;
-  std::queue<unsigned char> incoming;
-  unsigned char temp;
-  while(is_window_open()){
-    if(read(controllerFD, &temp, sizeof(temp)) <= 0){
-      usleep(1000);
-      continue;
-    }
-    else{
-      incoming.push(temp);
-    }
-    
-    if(incoming.size() >= 3){
-      packet[0] = incoming.front(); incoming.pop();
-      packet[1] = incoming.front(); incoming.pop();
-      packet[2] = incoming.front(); incoming.pop();
-    }
-    else continue;
-    
+    unsigned char packet[4];
     has_new = 1;
+    std::queue<unsigned char> incoming;
+    unsigned char temp;
+    while(is_window_open()){
+        if(read(controllerFD, &temp, sizeof(temp)) <= 0){
+            usleep(1000);
+            continue;
+        }
+        else{
+            incoming.push(temp);
+        }
     
-    if(packet[0] == PEDAL){
-      if(packet[1] >= 3 && packet[1] <= 11){
-	active_controller->slider[packet[1] - 3] = packet[2];
-      }
-      else if(packet[1] >= 14 && packet[1] <= 22){
-	active_controller->knob[packet[1] - 14] = packet[2];
-      }
-      else if(packet[1] == 9){
-	active_controller->big_slider = packet[2];
-      }
-      else if(packet[1] == 10){
-	if(packet[2]) active_controller->big_knob = packet[2];
-      }
-      else if(packet[1] >= 23 && packet[1] <= 31 && packet[2]){
-	active_controller->button[packet[1] - 23] ^= 1; //this toggles the state of the button
-      }
-      else if(packet[2]){ //only assign it if it was pressed. The application that reads it will have to reset the button.
-	switch(packet[1]){
-	case 49:
-	  active_controller->loop_back = packet[2];
-	  break;
-	case 47:
-	  active_controller->rewind = packet[2];
-	  break;
-	case 48:
-	  active_controller->fastforward = packet[2];
-	  break;
-	case 46:
-	  active_controller->stop = packet[2];
-	  break;
-	case 45:
-	  active_controller->start = packet[2];
-	  break;
-	case 44:
-	  active_controller->record = packet[2];
-	  break;
-	}
-      }
+        if(incoming.size() >= 3){
+            packet[0] = incoming.front(); incoming.pop();
+            packet[1] = incoming.front(); incoming.pop();
+            packet[2] = incoming.front(); incoming.pop();
+        }
+        else continue;
+    
+        has_new = 1;
+    
+        if(packet[0] == PEDAL){
+            if(packet[1] >= 3 && packet[1] <= 11){
+                active_controller->slider[packet[1] - 3] = packet[2];
+            }
+            else if(packet[1] >= 14 && packet[1] <= 22){
+                active_controller->knob[packet[1] - 14] = packet[2];
+            }
+            else if(packet[1] == 9){
+                active_controller->big_slider = packet[2];
+            }
+            else if(packet[1] == 10){
+                if(packet[2]) active_controller->big_knob = packet[2];
+            }
+            else if(packet[1] >= 23 && packet[1] <= 31 && packet[2]){
+                active_controller->button[packet[1] - 23] ^= 1; //this toggles the state of the button
+            }
+            else if(packet[2]){ //only assign it if it was pressed. The application that reads it will have to reset the button.
+                switch(packet[1]){
+                case 49:
+                    active_controller->loop_back = packet[2];
+                    break;
+                case 47:
+                    active_controller->rewind = packet[2];
+                    break;
+                case 48:
+                    active_controller->fastforward = packet[2];
+                    break;
+                case 46:
+                    active_controller->stop = packet[2];
+                    break;
+                case 45:
+                    active_controller->start = packet[2];
+                    break;
+                case 44:
+                    active_controller->record = packet[2];
+                    break;
+                }
+            }
+        }
     }
-  }
-  printf("Controller Thread is DEADBEEF\n");
-  return NULL;
+    printf("Controller Thread is DEADBEEF\n");
+    return NULL;
 }
 
 //this sets this controller to the one being written to by the

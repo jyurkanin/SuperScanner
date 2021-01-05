@@ -1,5 +1,12 @@
 SuperScanner Todo List
 
+* Plan
+  Do a help menu. Easy.
+  Do a menu for switching scan methods. No, just map it to buttons.
+  Do the ADSR.
+  3D Scan Path. It will be sick.
+  Do oversampling.
+
 * DONE Implement Network ODE
 
 * DONE Integrate with Existing Code
@@ -44,9 +51,10 @@ SuperScanner Todo List
   threading and race conditions. Ignoring for now.
   It was an issue with setting positions to 0 during strike().
   
+
 * DONE Mono Visualization
   Easy
-* TODO Gui Features
+* Gui Features
   Will implement with text boxes.
   Controller will be used for making batch changes.
 ** DONE Change Scan Path Menu
@@ -74,18 +82,35 @@ SuperScanner Todo List
 ** DONE Select Hammer Table
    Map to Controller.
 ** TODO Number Nodes in selection tables
-** TODO Help Menu
+** DONE Help Menu
    Print out the possible commands at the home screen.
+** DONE Switch Between Compute Scan Table methods
+   Self explanatory. Map it to a key?
+** DONE Menu that shows overall parameters?
+   Self explanatory.
+   Add button for scan table methods here.
+   Todo. Redo this. But make it so that the parameters visually correspond to the controller
+   So I can tell which slider/knob does what. Lmao.
+* TODO Create config file for mapping midi controller to functions.
+  Definitely a late stage thing.
+* TODO Convert to VST.
+  Not even sure how to do this. Cant be that easy.
+  This would probably be too hard actually.
 * DONE Rotate Viewer
   Easy.
 * DONE Panning Rotating Viewer
   Panning rotating view? Ooh, map it to a button. Easy.
+* DONE Map Viewer position and rotation to knobs and sliders.
+  Would be kinda cool.
 * DONE 2D Visualize Scan Path
   This would be easy so I'm not really worried about it.
   Will Do now.
 * TODO 3D Visualize Scan Path
   Show the Scan Path Changing over time. Would be sick.
-  Also rainbow over time.
+  Also rainbow over time. Could be scaled with ADSR gains
+  so that the scan path reaches the end when the release
+  of the gain times out. idk how that would work though because
+  sustain is a variable time thing.
 * DONE Runge-Kutta instead of Euler
   Better accuracy. Less oscillation. Possibly a bit faster.
   I dont notice any difference in sound. It does seem more accurate
@@ -93,40 +118,94 @@ SuperScanner Todo List
   I am running at .01 timestep and it seems still accurate. Which is
   greatly improved. Actually, Noticing inaccuracy at .01s timestep.
   Prefer .001
+* Backwards Euler Solver Instead of Runge Kutta
+  Backwards Euler is very good for physical systems.
+  It is the preferred solver for very stiff ODE's which this is.
+  Could be actually pretty hard to implement.
+  It will probably reduce high frequency oscillation between neighboring nodes
+  which has been a significant issue and has had consequences for sound quality.
+  
+  Consider ODE: y' = f(y)
+  
+  Backward Euler Method:
+  w_i1 = w_i + h*f(w_i1)
 
+  Solve for w_i1 with Newton's Method
+  w_i1 = wi - f(w_i)/df(wi)
+  
+  where df(wi) is the jacobian of f, and can be calculated through finite differences.
+
+  iterate the above line until converged.
+  Set y(i+1) = w_i1
+  
+  This would be completely impractical.
+  The Jacobian would be a square matrix of size 6*num_nodes.
+  The Jacobian would have to be calculated through finite differences, meaning 6*num_nodes
+  calls to ODE with a different state value changed each time. Or maybe I could figure out
+  a way to do it analytically. But I dont think so.
+  Additionally the Jacobian would have to be inverted and that would very intensive.
+
+  So this is not going to happen.
+  
+  
+* Speed Hacks
+** Structure of Arrays instead Array of Structures
+   Use 3 arrays for X,Y,Z instead of an array of X,Y,Z vectors
+   This creates a unit stride length which should greatly increase
+   speed. Actually, this probably won't increase performance. Stride length
+   is already unit stride actually.
+** Full Matrix Implementation of Simulation
+   Replace All math with EIgen matrix math.
+   Actually, due to sparsity of the connectivity matrix, this would probably decrease speed.
+** TODO Create List of all Non-Zero Connections
+   Replace connection matrix nested for loop with precomputed sorted list of connections.
+   Could be kinda difficult and might not even improve speed that much.
 * DONE Better Scan Path Interpolation
   Need to do a first order interp between old table and new table.
   Prevent Discontinuities.. Hopefully improve sound quality.
   Implemented. No change in sound after viewing through audacity.
 
-Hard:
-* TODO Adaptive Sampling and Anti-Aliasing
-  This will be tough.
 * DONE Map strikes to piano pedal.
   So note can ring out as frequency changes leading to a cool effect.
-  This has changed the whole project's vibe and led to a cool
-  innovation I think. Also do the release only iff pedal is released.
-* TODO ADSR. 
-  Color of scanner changes with ADSR gain. Fucking genius.
-  Would be cool. Possibly use damping and stiffness to implement
-  adsr instead of just boring gain. Will Fucking Do.
-
-* Possible frequency domain shit.
-  What if scan path was mapped to the gains
-  of harmonic sinusoidal components? Hmm.
-  Result is cool modulated additive synthesis.
+* TODO ADSR.
+  Need a level controller as well.
+  Start an ADSR when you hit a new note.
+  Color of scanner changes with ADSR gain.
+  Would be cool.
+  ADSR will feature 12 linear segments. And
+  You will be able to click them with the mouse.
+  ADSR works. Clicks with mouse and everything.
+  Just needs to resolve some audio clicks.
+* TODO Sort ADSR points
+  so that the points are increasing by x value.
+  
 * Higher Order Interpolation in Tick.
   Lead to smoother waveforms. Or just fucking low pass the wave maybe. IDK.
-  Actually, Probably not necessary to implement this. I don't think it would
-  achieve very much.
-* Optimizations
-  Replace Stiffness Matrix with an eigen matrix. Do direct matrix multiply
-  instead of using for loops. COuld lead to better vectorization.
+  This probably isn't necessary but maybe it would work. Idk.
+
+Hard:
+* TODO Adaptive Sampling and Anti-Aliasing
+  This will be tough. Over-sample around 2x and then apply brick wall filter for freqs
+  above 20,000. Hopefully this won't be too slow.
+
+* DONE Level Controller for adjusting volume
+  Control output amplitude at constant level.
+  Should do this before doing ADSR.
+  I implemented a compressor.
+
 * Known bugs:
-  With RK4, something weird is happening and not every strike gets counted.
-//weird bug. Lots of static.
-  //Getting weird pew-pew sounds when I press different notes. Portamento is the culprit I assume. It had to do with reseting k_ after each note change. No idea why this has to be reset.
-  //Sometimes hangs on exit.
-  //Weird segfault and memory corruption.
-  //weird segfault. Went away when I fixeed a function that returned non null with no return statement.
-  Viewer has fisheye distortion going on.
+With RK4, something weird is happening and not every strike gets counted.
+//Sometimes hangs on exit.
+//Weird segfault and memory corruption.
+
+* DONE Viewer has fisheye distortion going on.
+  The distortion is actually pretty bad. I think I know what the cause is. I need to fix the pixel mapping functions. I'm using radians when I should be using similar triangles.
+  Yep similar triangles fixed it.
+
+Sometimes when I press a note, theres a weird laser pew sound. So the portamento is fucked probably.
+* Benchmarks
+  Using the RK4 solver takes about 4x as long as the Euler solver.
+  Which is exactly what I expect.
+  
+  Forward Euler goes unstable where RK4 is stable.
+  Forward EUler leads to more jagged wave forms.

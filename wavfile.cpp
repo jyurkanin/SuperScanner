@@ -6,7 +6,7 @@ WavFile::WavFile(char * filename){
     if(read(fd, &header, sizeof(header)) != sizeof(header)) printf("error2\n");
     //print();
 
-    data_len = header.subchunk2Size / (header.bitsPerSample >> 3);
+    data_len = header.subchunk2Size / (header.bitsPerSample >> 3); //had a divide by zero right here.
     int16_t *pcm = new int16_t[data_len];
     data = new float[data_len];
     

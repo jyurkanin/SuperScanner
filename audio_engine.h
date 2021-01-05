@@ -14,6 +14,7 @@
 #include "controller.h"
 #include "super_scanner.h"
 
+
 #define MIDI_NOTE_ON 0x90
 #define MIDI_NOTE_OFF 0x80
 #define PEDAL 176
@@ -32,3 +33,10 @@ int init_midi(int argc, char *argv[]);
 int del_midi();
 void *midi_loop(void *arg);
 void *audio_thread(void *arg);
+
+
+//Dsp functions
+
+float compress_audio(float in, float attack, float threshold, float ratio);
+float get_curr_rms();
+float get_out_rms();

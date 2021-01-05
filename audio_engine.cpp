@@ -37,64 +37,75 @@ void *audio_thread(void *arg){
     float stereo_frames[441*NUM_CHANNELS];
     
     while(is_window_open()){
-      snd_pcm_wait(playback_handle, 100);
-      frames_to_deliver = snd_pcm_avail_update(playback_handle);
-      if ( frames_to_deliver == -EPIPE){
-	snd_pcm_prepare(playback_handle);
-	printf("Epipe\n");
-	continue;
-      }
+        snd_pcm_wait(playback_handle, 100);
+        frames_to_deliver = snd_pcm_avail_update(playback_handle);
+        if ( frames_to_deliver == -EPIPE){
+            snd_pcm_prepare(playback_handle);
+            printf("Epipe\n");
+            continue;
+        }
       
-      frames_to_deliver = frames_to_deliver > 441 ? 441 : frames_to_deliver;
-      memset(sum_frames, 0, 441*sizeof(float));
+        frames_to_deliver = frames_to_deliver > 441 ? 441 : frames_to_deliver;
+        memset(sum_frames, 0, 441*sizeof(float));
+        //memset(stereo_frames, 0, 882*sizeof(float));
       
       
       
-      for(int k = 21; k <= 108; k++){
-	//this is going to assume that the midi thread handles the sustaining. ANd will only issue a note off if the sustain is not active
-	if(midiNotesPressed[k]){
-	  volume = midiNotesPressed[k];
-	  midiNotesPressed[k] = 0;
-	  scanner->start_adsr();
+        for(int k = 21; k <= 108; k++){
+            //this is going to assume that the midi thread handles the sustaining. ANd will only issue a note off if the sustain is not active
+            if(midiNotesPressed[k]){
+                volume = midiNotesPressed[k];
+                midiNotesPressed[k] = 0;
+
+                scanner->startNote();
+                if(scanner->pad_mode){
+                    scanner->strike();
+                }
 	  
-	  last_note = curr_note;
-	  curr_note = k;
-	}
-      }
-      for(int k = 21; k <= 108; k++){
-	if(midiNotesReleased[k]){
-	  midiNotesReleased[k] = 0; //lets just pray we dont have race conditions.
-	  if(k == curr_note){ //activate note release.
-	    curr_note = -1;
-	    last_note = -1;
-	  }
-	}
-      }
+                last_note = curr_note;
+                curr_note = k;
+            }
+        }
+        for(int k = 21; k <= 108; k++){
+            if(midiNotesReleased[k]){
+                midiNotesReleased[k] = 0; //lets just pray we dont have race conditions.
+                if(k == curr_note){ //activate note release.
+                    scanner->release();
+                    curr_note = -1;
+                    last_note = -1;
+                }
+            }
+        }
 
-      for(int j = 0; j < frames_to_deliver; j++){
-	sum_frames[j] = scanner->tick(curr_note, volume);
-	stereo_frames[2*j] = sum_frames[j];
-	stereo_frames[2*j + 1] = sum_frames[j];
-      }
+        float temp_sample;
+        for(int j = 0; j < frames_to_deliver; j++){
+            temp_sample = scanner->tick(curr_note, volume);
+            //              compress_audio(float in, float attack, float threshold, float ratio);
+            temp_sample = compress_audio(temp_sample, 100, .05, .01);
+            temp_sample = temp_sample*scanner->get_adsr_gain();
+            sum_frames[j] = temp_sample;
+            stereo_frames[2*j] = sum_frames[j];
+            stereo_frames[2*j + 1] = sum_frames[j];
+        }
 
       
-      /*
-      if(main_controller.get_button(2)){
-	for(int j = 0; j < frames_to_deliver; j++){
-	  reverb.tick(sum_frames[j], sum_frames[j], stereo_frames[2*j], stereo_frames[2*j + 1]);
-	}
-      }
-      else{
-        for(int j = 0; j < frames_to_deliver; j++){
-	  stereo_frames[2*j] = sum_frames[j]; //split
-	  stereo_frames[2*j + 1] = sum_frames[j];
-	}
-      }
-      */
-      while((err = snd_pcm_writei(playback_handle, stereo_frames, frames_to_deliver)) != frames_to_deliver && is_window_open()) {
-	snd_pcm_prepare(playback_handle);
-	fprintf(stderr, "write to audio interface failed (%s)\n", snd_strerror (err));
-      }
+        /*
+          if(main_controller.get_button(2)){
+          for(int j = 0; j < frames_to_deliver; j++){
+          reverb.tick(sum_frames[j], sum_frames[j], stereo_frames[2*j], stereo_frames[2*j + 1]);
+          }
+          }
+          else{
+          for(int j = 0; j < frames_to_deliver; j++){
+          stereo_frames[2*j] = sum_frames[j]; //split
+          stereo_frames[2*j + 1] = sum_frames[j];
+          }
+          }
+        */
+        while((err = snd_pcm_writei(playback_handle, stereo_frames, frames_to_deliver)) != frames_to_deliver && is_window_open()) {
+            snd_pcm_prepare(playback_handle);
+            fprintf(stderr, "write to audio interface failed (%s)\n", snd_strerror (err));
+        }
     }
     printf("Audio Thread is DEAD\n");
     return NULL;
@@ -255,3 +266,47 @@ void *midi_loop(void *ignoreme){
   printf("Piano Thread is DEADBEEF\n");
   return 0;
 }
+
+
+
+
+/*
+ * Dsp Functions
+ * Audio Compression
+ *
+ */
+
+float out_rms = 0;
+float curr_rms = 0; //lpf rms.
+float compress_audio(float in, float attack, float threshold, float ratio){
+    float in_rms = fabs(in); //oh this isnt actually the root-mean-square. oh rip.
+    float out;
+    
+    curr_rms += (in_rms - curr_rms)/attack;
+
+    float norm_sample = in / curr_rms;
+
+    
+    if(curr_rms > threshold){
+        out_rms = (threshold + ((curr_rms - threshold)*ratio));
+        out = norm_sample*out_rms;
+    }
+    else{
+        out_rms = curr_rms;
+        out = norm_sample*curr_rms;
+    }
+    
+    return out;
+}
+
+float get_curr_rms(){
+    return curr_rms;
+}
+
+float get_out_rms(){
+    return out_rms;
+}
+
+
+
+
