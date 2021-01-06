@@ -20,6 +20,8 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   sim_mutex = 0;
   has_scan_update = 0;
   release_flag = 1;
+
+  test_knob = .9;
   
   controller = Controller();
   controller.activate();
@@ -125,7 +127,9 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   adsr_table[adsr_table_len-1][0] = 1.00;
   adsr_table[adsr_table_len-1][1] = 0;
   adsr_state = 0;
-  adsr_gain = 1;
+  adsr_gain = 0;
+  adsr_gain_naive = 0;
+  gain_before_release = 0;
   
   node_pos = new Vector3f[num_nodes];
   node_vel = new Vector3f[num_nodes];
@@ -168,7 +172,7 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   
   //init_params associated with controller
 
-  pad_mode = 1;
+  pad_mode = 0;
   k_ = 0;
   setHammer(55); //Nice. I like this function. Really gets the job done.
 }
@@ -198,10 +202,14 @@ float SuperScanner::tick(int note, float volume){
   static int was_released = 1;
   static float p_freq = 0;
   static uint32_t k_update = 0;
-
+  static float idx = 0;
+  
   if(has_scan_update){
       k_update = k_;
       has_scan_update = 0;
+      for(int i = 0; i < scan_len; i++){
+          old_scan_table[i] = scan_table[i];
+      }
   }
   
   float freq = 0;
@@ -211,28 +219,23 @@ float SuperScanner::tick(int note, float volume){
   
   if((note != -1) && was_released){p_freq = freq;}
   else if((note != -1) && !was_released){p_freq += (freq - p_freq)/1000;}
-
-  /*
-  if((k_ % 1000) == 0){
-      log_file << adsr_gain << ',' << k_ <<'\n';
-  }
-  */
+  
   
   compute_scan_table();
+
+  float temp = p_freq*scan_len/((float)sample_rate);
+  idx = fmod(idx+temp, scan_len); //fmod(p_freq*k_*scan_len/((float)sample_rate), scan_len);
+
+  //log_file << idx << "\n";
   
-  float idx = fmod(p_freq*k_*scan_len/((float)sample_rate), scan_len);
   int lower = floorf(idx);
   float diff = idx - lower;
   float sample = scan_table[lower]*(1-diff) + scan_table[lower+1]*(diff); //interpolate along scan table axis
   float old_sample = old_scan_table[lower]*(1-diff) + old_scan_table[lower+1]*(diff);
-
+  
   diff = std::min(1.0f, (k_ - k_update)/(sample_rate*timestep));
   float i_sample = sample*diff + old_sample*(1-diff); //interpolate along time axis.
   
-  
-  for(int i = 0; i < scan_len; i++){
-      old_scan_table[i] = scan_table[i];
-  }
   
   
   k_++;
@@ -240,30 +243,55 @@ float SuperScanner::tick(int note, float volume){
   return i_sample * .2 * m_volume * volume / 127.0;
 }
 
+void SuperScanner::sort_adsr_table(){
+    //insertion sort because I'm stupid and the table is small.
+    Vector2f *temp_table = new Vector2f[adsr_table_len];
+    
+    float min;
+    unsigned midx;
+    for(unsigned i = 0; i < adsr_table_len; i++){
+        min = SCREEN_WIDTH*4;
+        midx = 0;
+        for(unsigned j = 0; j < adsr_table_len; j++){
+            if(adsr_table[j][0] == -1){
+                continue;
+            }
+            else if(adsr_table[j][0] < min){
+                min = adsr_table[j][0];
+                midx = j;
+            }
+        }
+        temp_table[i] = adsr_table[midx];
+        adsr_table[midx] = Vector2f(-1,0);
+    }
+    
+    for(unsigned i = 0; i < adsr_table_len; i++){
+        adsr_table[i] = temp_table[i];
+    }
+    delete[] temp_table;
+}
+
+/*
+//This clicks very hard and is stupider than the other method
 float SuperScanner::get_adsr_gain(){
-    unsigned final_sustain_state = floorf(adsr_table_len*.75);
-    unsigned k_norm; 
+    unsigned final_sustain_state = adsr_table_len - 2;//floorf(adsr_table_len*.75);
     float tc = 2*sample_rate; //time constant. to samples. 2 means the total envelope is 2 seconds long.
     float y1, y2, slope, dist;
     float gain;
     unsigned k_temp;
+    unsigned k_norm;
+    unsigned release_time = tc*(adsr_table[adsr_table_len-1][0] - adsr_table[final_sustain_state][0]);
     
     if(release_flag){
-        k_temp = k_ - release_k + tc*adsr_table[final_sustain_state][0];
-        if((k_temp >= (tc*adsr_table[adsr_state+1][0])) && (adsr_state != (adsr_table_len-1))){
-            printf("adsr_state release%d\n", adsr_state);
-            adsr_state++;
-        }
-        if(adsr_state != (adsr_table_len-1)){
-            k_norm = k_temp - tc*adsr_table[adsr_state][0];
-            y1 = adsr_table[adsr_state][1];
-            y2 = adsr_table[adsr_state+1][1];
-            dist = (adsr_table[adsr_state+1][0] - adsr_table[adsr_state][0])*tc;
-            slope = (y2-y1)/dist;
-            gain = (k_norm*slope) + y1;
+        k_temp = k_ - release_k;
+        if(k_temp > release_time){
+            gain = adsr_table[adsr_table_len-1][1];
         }
         else{
-            gain = adsr_table[adsr_table_len-1][1];
+            y1 = gain_before_release;
+            y2 = adsr_table[adsr_table_len-1][1];
+            slope = (y2-y1)/release_time;
+            gain = (k_temp*slope) + y1;
         }
     }
     else{
@@ -286,6 +314,34 @@ float SuperScanner::get_adsr_gain(){
     adsr_gain = gain;
     return gain;
 }
+*/
+
+float SuperScanner::get_adsr_gain(){
+    unsigned final_sustain_state = adsr_table_len - 2;//floorf(adsr_table_len*.75);
+    float tc = 2*sample_rate; //time constant. to samples. 2 means the total envelope is 2 seconds long.
+    float slope;
+    
+    
+    slope = (adsr_table[adsr_state+1][1] - adsr_table[adsr_state][1]) / ((float)tc*(adsr_table[adsr_state+1][0] - adsr_table[adsr_state][0]));
+    if(release_flag){
+        adsr_state = final_sustain_state;
+    }
+    else if(adsr_state == final_sustain_state){
+        slope = 0;
+    }
+    else if((slope > 0 && (adsr_gain > adsr_table[adsr_state+1][1])) || (slope < 0 && (adsr_gain < adsr_table[adsr_state+1][1]))){
+        adsr_state++;
+        //printf("adsr_state %d\n", adsr_state);
+    }
+    
+    adsr_gain_naive = std::max(0.0f, adsr_gain_naive+slope); //max prevents adsr_gain from going negative during release phase.
+    
+    float mix = .05; //highest I can set it and still have clicks removed. This is just a bandaid. :(
+    adsr_gain = (adsr_gain*(1-mix)) + (adsr_gain_naive*mix); //slew limiter on the adsr
+    
+    return adsr_gain;
+}
+
 
 void SuperScanner::compute_scan_table(){
     float sum;
@@ -300,7 +356,7 @@ void SuperScanner::compute_scan_table(){
             scan_table[i] = ((node_pos[scan_path[i]] - node_eq_pos[scan_path[i]]).norm()); //this only gives positive numbers. Possibly lame
             break;
         case 2:
-            temp = (node_pos[scan_path[i]] - node_eq_pos[scan_path[i]]);
+            temp = node_pos[scan_path[i]] - node_eq_pos[scan_path[i]];
             sum = temp[0] + temp[1] + temp[2];
             scan_table[i] = sum;
             break;
@@ -452,7 +508,7 @@ void SuperScanner::ODE(Vector3f *X, Vector3f *Xd){
     Vector3f eq_dist; //displacement from node eq. position.
   
     //Let N be num_nodes
-    float stiffness_boost = stiffness_bias;
+    float stiffness_boost = 0;
     float damping_boost = damping_bias;
     if(release_flag){
         stiffness_boost = release_stiffness;
@@ -472,7 +528,7 @@ void SuperScanner::ODE(Vector3f *X, Vector3f *Xd){
         F_spring[2] = 0;
     
         for(int j = 0; j < num_nodes; j++){ //I'm hoping that writing it this way will allow the compiler to vectorize easier. Or later I can vectorize it manually.
-            float stiff = stiffness_matrix[(i*num_nodes) + j];
+            float stiff = stiffness_matrix[(i*num_nodes) + j] + stiffness_bias;
             if(stiff == 0) continue;
             d_pos[j] = X[j] - X[i];
             d_pos_norm[j] = d_pos[j].norm();
@@ -499,19 +555,20 @@ void SuperScanner::ODE(Vector3f *X, Vector3f *Xd){
             Xd[i+num_nodes][2] = 0;
         }
     }
-  
+    
 }
 
 void SuperScanner::release(){
-    state_before_release = adsr_state;
+    gain_before_release = adsr_gain;
     release_flag = 1;
     release_k = k_;
 }
 
 void SuperScanner::startNote(){
-  k_= 0;
-  release_flag = 0;
-  adsr_state = 0;
+    //k_ = 0; //this is causing a phase issue which leads to clicks.
+    release_flag = 0;
+    adsr_state = 0;
+    adsr_gain_naive = 0;
 }
 
 void SuperScanner::strike(){
@@ -537,7 +594,7 @@ void SuperScanner::strike(){
 
 int SuperScanner::start(){
   log_file.open("log_file.csv");
-  log_file << "gain,k\n";
+  log_file << "idx\n";
   
   is_window_open_ = 1;
   pthread_create(&scan_thread, NULL, &(simulate_wrapper), (void*)this);
@@ -624,8 +681,9 @@ void SuperScanner::update_params(){
     scanner_rot[1] = controller.get_knob(6)*M_PI*2/127.0;
     scanner_rot[2] = controller.get_knob(7)*M_PI*2/127.0;
     
+    test_knob = controller.get_knob(8)/128.0;
     
-    pad_mode = controller.get_button(0);
+    pad_mode = !controller.get_button(0);
   }
 }
 

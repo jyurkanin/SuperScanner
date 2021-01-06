@@ -17,8 +17,9 @@ Vector3f origin = {0,0,0};
 float viewer_angle = 0;
 float d_angle = 0;
 
-float get_adsr_color_scalar(){
-    return 1 - (scanner->adsr_gain/4);
+unsigned get_adsr_color(unsigned color){
+    unsigned scaled_color = color*(std::min(1.0f,scanner->adsr_gain)); //adsr_gain is a max of 2.
+    return (scaled_color & color) + 0x00FF;
 }
 
 int get_num(){ //read the keyboard for a number
@@ -95,7 +96,7 @@ void draw_adsr_menu(Display *dpy, Window w, GC gc, int node_sel_x){
     segs[num_divs-1].x2 = SCREEN_WIDTH*scanner->adsr_table[first_release_state][0];
     
     XPoint points[scanner->adsr_table_len];
-    for(int i = 0; i < scanner->adsr_table_len; i++){
+    for(unsigned i = 0; i < scanner->adsr_table_len; i++){
         points[i].x = SCREEN_WIDTH*scanner->adsr_table[i][0];
         points[i].y = SCREEN_HEIGHT*(1-scanner->adsr_table[i][1]);
     }
@@ -107,7 +108,7 @@ void draw_adsr_menu(Display *dpy, Window w, GC gc, int node_sel_x){
     XSetForeground(dpy, gc, 0xFF);
     XDrawLines(dpy, w, gc, points, scanner->adsr_table_len, CoordModeOrigin);
     XSetForeground(dpy, gc, 0xFF00);
-    XFillArc(dpy, w, gc, scanner->adsr_table[node_sel_x][0]*SCREEN_WIDTH, SCREEN_HEIGHT*(1 - scanner->adsr_table[node_sel_x][1]), 3, 3, 0, 360*64);
+    XFillArc(dpy, w, gc, scanner->adsr_table[node_sel_x][0]*SCREEN_WIDTH, SCREEN_HEIGHT*(1 - scanner->adsr_table[node_sel_x][1]), 5, 5, 0, 360*64);
 }
 
 void handle_adsr_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel_x){
@@ -141,6 +142,9 @@ void handle_adsr_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel
                 scanner->adsr_table[node_sel_x][0] = e.xbutton.x_root/(float)SCREEN_WIDTH;
                 scanner->adsr_table[node_sel_x][1] = 1 - (e.xbutton.y_root/(float)SCREEN_HEIGHT);
                 node_sel_x = std::min((int)scanner->adsr_table_len-2, node_sel_x+1); //me gusta
+
+                //scanner->sort_adsr_table();
+                
                 break;
             }
             break;
@@ -178,8 +182,8 @@ void draw_scanner_2d_menu(Display *dpy, Window w, GC gc){
         scan_segs[i].y2 = (SCREEN_HEIGHT/2) + scanner->scan_table[i+1]*50;
     }
 
-    float scalar = get_adsr_color_scalar();
-    XSetForeground(dpy, gc, 0xFF0000*scalar);
+    unsigned color = get_adsr_color(0xFF0000);
+    XSetForeground(dpy, gc, color);
     XDrawSegments(dpy, w, gc, scan_segs, scanner->scan_len);
 }
 
@@ -346,16 +350,16 @@ void draw_scanner(Display *dpy, Window w, GC gc, int mono){
       }
   }
 
-  float scalar = get_adsr_color_scalar();
+  unsigned color = get_adsr_color(0xFF0000);
   
   if(mono){
-      XSetForeground(dpy, gc, 0xFF0000*scalar);
+      XSetForeground(dpy, gc, color);
       draw_mono_lines(start, end, actual_len);
       XSetForeground(dpy, gc, 0xFF);
       draw_mono_points(node_pos_rot, num_nodes);
   }
   else{
-      XSetForeground(dpy, gc, 0xFF0000*scalar);
+      XSetForeground(dpy, gc, color);
       draw_stereo_lines(start, end, actual_len);
       XSetForeground(dpy, gc, 0xFF);
       draw_stereo_points(node_pos_rot, num_nodes);

@@ -80,7 +80,7 @@ void *audio_thread(void *arg){
         float temp_sample;
         for(int j = 0; j < frames_to_deliver; j++){
             temp_sample = scanner->tick(curr_note, volume);
-            //              compress_audio(float in, float attack, float threshold, float ratio);
+            //compress_audio(float in, float attack, float threshold, float ratio);
             temp_sample = compress_audio(temp_sample, 100, .05, .01);
             temp_sample = temp_sample*scanner->get_adsr_gain();
             sum_frames[j] = temp_sample;

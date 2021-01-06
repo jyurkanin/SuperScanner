@@ -116,7 +116,7 @@ void draw_select_box(int node_sel);
 int rainbow(int c);
 Matrix3f get_rotation(float x, float y, float z);
 int get_num();
-float get_adsr_color_scalar();
+unsigned get_adsr_color(unsigned color);
 
 ProjectedStereoPoints project_stereo_point(Vector3f point_v, Vector3f view_v);
 StereoPixels projection_to_stereo_pixels(ProjectedStereoPoints pp);

@@ -167,7 +167,7 @@ SuperScanner Todo List
 
 * DONE Map strikes to piano pedal.
   So note can ring out as frequency changes leading to a cool effect.
-* TODO ADSR.
+* DONE ADSR.
   Need a level controller as well.
   Start an ADSR when you hit a new note.
   Color of scanner changes with ADSR gain.
@@ -176,8 +176,12 @@ SuperScanner Todo List
   You will be able to click them with the mouse.
   ADSR works. Clicks with mouse and everything.
   Just needs to resolve some audio clicks.
+  I have changed the release thing. So that it just
+  releases to zero with one segment.
 * TODO Sort ADSR points
   so that the points are increasing by x value.
+  Easy. I know how to sort, I'm not an idiot.
+  Actually its being pretty stupid so I'm ignoring it for now.
   
 * Higher Order Interpolation in Tick.
   Lead to smoother waveforms. Or just fucking low pass the wave maybe. IDK.
@@ -197,6 +201,7 @@ Hard:
 With RK4, something weird is happening and not every strike gets counted.
 //Sometimes hangs on exit.
 //Weird segfault and memory corruption.
+//fixed clicks by changing how scan table is scanned. Not using integer k_. Clicking greatly reduced between different notes.
 
 * DONE Viewer has fisheye distortion going on.
   The distortion is actually pretty bad. I think I know what the cause is. I need to fix the pixel mapping functions. I'm using radians when I should be using similar triangles.
