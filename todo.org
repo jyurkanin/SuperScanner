@@ -178,11 +178,23 @@ SuperScanner Todo List
   Just needs to resolve some audio clicks.
   I have changed the release thing. So that it just
   releases to zero with one segment.
-* TODO Sort ADSR points
+  Redid the ADSR. Works better. Minimal clicking.
+  Although I accomplished this by using a slew limiter on the adsr gain. which is cheating
+  and reduces the snappiness of the attack envelope.
+* DONE Sort ADSR points
   so that the points are increasing by x value.
   Easy. I know how to sort, I'm not an idiot.
   Actually its being pretty stupid so I'm ignoring it for now.
+* TODO Polyphony?
+  Using the scanner as a main oscillator. Do polyphony. Kinda hard.
+  Would have to add the result of all notes together and perform 
+  antialiasing at the end.
   
+* TODO Add the Reverb
+  Hopefully I can just copy paste the code I already wrote.
+  But maybe not which would be bad. I can definitely create a
+  window pretty easy I think. Damn I'd have to copy and paste
+  the window code and the dsp code. Frick. Hopefully it works out.
 * Higher Order Interpolation in Tick.
   Lead to smoother waveforms. Or just fucking low pass the wave maybe. IDK.
   This probably isn't necessary but maybe it would work. Idk.

@@ -20,8 +20,8 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   sim_mutex = 0;
   has_scan_update = 0;
   release_flag = 1;
-
-  test_knob = .9;
+  
+  
   
   controller = Controller();
   controller.activate();
@@ -50,8 +50,6 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   for(int i = 0; i < scan_len; i++){
       scan_path[i] = i;
   }
-  
-  
   
   //create a linear network
   stiffness_matrix = new float[num_nodes*num_nodes];
@@ -166,9 +164,9 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
       node_mass[i] = 1;
   }
   
-  timestep = .001; //randomly chosen. .01 was unstable.
+  timestep = .001; //.01 was unstable. This seems to work.
 
-  sample_rate = 44100;
+  sample_rate = 44100*oversample_factor;
   
   //init_params associated with controller
 
@@ -318,7 +316,7 @@ float SuperScanner::get_adsr_gain(){
 
 float SuperScanner::get_adsr_gain(){
     unsigned final_sustain_state = adsr_table_len - 2;//floorf(adsr_table_len*.75);
-    float tc = 2*sample_rate; //time constant. to samples. 2 means the total envelope is 2 seconds long.
+    float tc = 2*sample_rate/oversample_factor; //time constant. to samples. 2 means the total envelope is 2 seconds long.
     float slope;
     
     
@@ -681,7 +679,6 @@ void SuperScanner::update_params(){
     scanner_rot[1] = controller.get_knob(6)*M_PI*2/127.0;
     scanner_rot[2] = controller.get_knob(7)*M_PI*2/127.0;
     
-    test_knob = controller.get_knob(8)/128.0;
     
     pad_mode = !controller.get_button(0);
   }

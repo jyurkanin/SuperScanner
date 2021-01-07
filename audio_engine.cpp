@@ -24,7 +24,111 @@ void breakOnMe(){
   //break me on, Break on meeeeeee
 }
 
+
+float anti_alias8(float in){
+    float num[] = {8.6095831e-08, 6.8876665e-07, 2.4106832e-06, 4.8213665e-06, 6.0267084e-06,
+                   4.8213665e-06, 2.4106832e-06, 6.8876665e-07, 8.6095831e-08};
+    float den[] = {1,          -6.539904,    18.824587,   -31.133986,    32.34734,
+                   -21.611418,     9.064311,    -2.18151,      0.23060125};
+    
+    const int order = 8;
+    static float x[order+1] = {0,0,0,0,0,0,0,0,0};
+    static float y[order+1] = {0,0,0,0,0,0,0,0,0};
+    
+    for(int i = order; i > 0; i--){
+        x[i] = x[i-1];
+    }
+    x[0] = in;
+    
+    float x_sum = 0;
+    float y_sum = 0;
+    for(int i = 0; i < order+1; i++){
+        x_sum += (x[i] * num[i]);
+    }
+    for(int i = 1; i < order+1; i++){
+        y_sum += (y[i-1] * den[i]);
+    }
+    for(int i = order; i > 0; i--){
+        y[i] = y[i-1];
+    }    
+    y[0] = x_sum - y_sum;
+    
+    return y[0];
+        
+}
+
+float anti_alias4(float in){
+    float num[] = {7.2792000e-07, 7.2792004e-06, 3.2756401e-05, 8.7350403e-05, 1.5286320e-04,
+                   1.8343584e-04, 1.5286320e-04, 8.7350403e-05, 3.2756401e-05, 7.2792004e-06,
+                   7.2792000e-07};
+    float den[] = { 1.0000000e+00, -6.3600154e+00,  1.8665571e+01, -3.3157608e+01,
+                    3.9371616e+01, -3.2583000e+01,  1.9000641e+01, -7.6987863e+00,
+                    2.0719559e+00, -3.3412316e-01,  2.4495861e-02};
+
+    const int order = 10;
+    static float x[order+1] = {0,0,0,0,0,0,0,0,0,0,0};
+    static float y[order+1] = {0,0,0,0,0,0,0,0,0,0,0};
+    
+    for(int i = order; i > 0; i--){
+        x[i] = x[i-1];
+    }
+    x[0] = in;
+    
+    float x_sum = 0;
+    float y_sum = 0;
+    for(int i = 0; i < order+1; i++){
+        x_sum += (x[i] * num[i]);
+    }
+    for(int i = 1; i < order+1; i++){
+        y_sum += (y[i-1] * den[i]);
+    }
+    for(int i = order; i > 0; i--){
+        y[i] = y[i-1];
+    }    
+    y[0] = x_sum - y_sum;
+    
+    return y[0];
+        
+}
+
+float anti_alias2(float in){
+    float num[] = {6.82387827e-06, 1.09182052e-04, 8.18865432e-04, 3.82137182e-03,
+                   1.24194585e-02, 2.98067015e-02, 5.46456166e-02, 7.80651718e-02,
+                   8.78233165e-02, 7.80651718e-02, 5.46456166e-02, 2.98067015e-02,
+                   1.24194585e-02, 3.82137182e-03, 8.18865432e-04, 1.09182052e-04,
+                   6.82387827e-06};
+    float den[] = { 1.0000000e+00, -2.9343348e+00,  6.0569754e+00, -8.4904690e+00,
+                    9.4275398e+00, -8.2493067e+00,  5.9339728e+00, -3.4944806e+00,
+                    1.7052743e+00, -6.8370658e-01,  2.2441590e-01, -5.9260190e-02,
+                    1.2332326e-02, -1.9465445e-03,  2.1958887e-04, -1.5769092e-05,
+                    5.4263586e-07};
+    
+    static float x[17] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+    static float y[17] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+    
+    for(int i = 16; i > 0; i--){
+        x[i] = x[i-1];
+    }
+    x[0] = in;
+    
+    float x_sum = 0;
+    float y_sum = 0;
+    for(int i = 0; i < 17; i++){
+        x_sum += (x[i] * num[i]);
+    }
+    for(int i = 1; i < 17; i++){
+        y_sum += (y[i-1] * den[i]);
+    }
+    for(int i = 16; i > 0; i--){
+        y[i] = y[i-1];
+    }    
+    y[0] = x_sum - y_sum;
+    
+    return y[0];
+}
+
 void *audio_thread(void *arg){
+    float oversample_frames[441*scanner->oversample_factor];
     float sum_frames[441];
     
     int err;
@@ -78,14 +182,22 @@ void *audio_thread(void *arg){
         }
 
         float temp_sample;
-        for(int j = 0; j < frames_to_deliver; j++){
+        for(int j = 0; j < (frames_to_deliver*scanner->oversample_factor); j++){
             temp_sample = scanner->tick(curr_note, volume);
+            oversample_frames[j] = anti_alias2(temp_sample);
+        }
+        
+        int idx = 0;
+        for(int j = 0; j < frames_to_deliver; j++){
+            temp_sample = oversample_frames[idx];
             //compress_audio(float in, float attack, float threshold, float ratio);
             temp_sample = compress_audio(temp_sample, 100, .05, .01);
             temp_sample = temp_sample*scanner->get_adsr_gain();
-            sum_frames[j] = temp_sample;
-            stereo_frames[2*j] = sum_frames[j];
-            stereo_frames[2*j + 1] = sum_frames[j];
+            
+            
+            stereo_frames[2*j] = temp_sample;
+            stereo_frames[2*j + 1] = temp_sample;
+            idx += scanner->oversample_factor;
         }
 
       

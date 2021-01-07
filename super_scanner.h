@@ -41,7 +41,7 @@ public:
   int start();
   int stop();
 
-
+  const int oversample_factor = 2;
   const int num_nodes;
   Vector3f *node_pos;
   float *stiffness_matrix; //Oh boyo. Upper triangular. to avoid repetition.
