@@ -160,6 +160,9 @@ SuperScanner Todo List
 ** TODO Create List of all Non-Zero Connections
    Replace connection matrix nested for loop with precomputed sorted list of connections.
    Could be kinda difficult and might not even improve speed that much.
+
+* TODO Save and Load
+  Would be extremely useful.
 * DONE Better Scan Path Interpolation
   Need to do a first order interp between old table and new table.
   Prevent Discontinuities.. Hopefully improve sound quality.
@@ -190,19 +193,24 @@ SuperScanner Todo List
   Would have to add the result of all notes together and perform 
   antialiasing at the end.
   
-* TODO Add the Reverb
+* DONE Add the Reverb
   Hopefully I can just copy paste the code I already wrote.
   But maybe not which would be bad. I can definitely create a
   window pretty easy I think. Damn I'd have to copy and paste
   the window code and the dsp code. Frick. Hopefully it works out.
+  Easy peasy. It all worked out in the end.
 * Higher Order Interpolation in Tick.
   Lead to smoother waveforms. Or just fucking low pass the wave maybe. IDK.
   This probably isn't necessary but maybe it would work. Idk.
 
 Hard:
-* TODO Adaptive Sampling and Anti-Aliasing
+* DONE Adaptive Sampling and Anti-Aliasing
   This will be tough. Over-sample around 2x and then apply brick wall filter for freqs
   above 20,000. Hopefully this won't be too slow.
+  2x seems to work best. Havent been able to confirm that it works with audacity
+  spectrum analysis. But audibly it is definitely improved. I tried at 8x oversampling
+  But that seemed to lowpass the signal way too much. It did more than antialias. It was
+  Just lowpassing the signal a ton.
 
 * DONE Level Controller for adjusting volume
   Control output amplitude at constant level.

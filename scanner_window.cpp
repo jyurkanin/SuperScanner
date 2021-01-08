@@ -4,6 +4,8 @@
 #include <ctype.h>
 #include <string.h>
 
+
+
 Display *dpy;
 Window w;
 GC gc;
@@ -109,6 +111,27 @@ void draw_adsr_menu(Display *dpy, Window w, GC gc, int node_sel_x){
     XDrawLines(dpy, w, gc, points, scanner->adsr_table_len, CoordModeOrigin);
     XSetForeground(dpy, gc, 0xFF00);
     XFillArc(dpy, w, gc, scanner->adsr_table[node_sel_x][0]*SCREEN_WIDTH, SCREEN_HEIGHT*(1 - scanner->adsr_table[node_sel_x][1]), 5, 5, 0, 360*64);
+}
+
+void handle_reverb_menu(Display *dpy, Window w, GC gc, int &menu_id){
+    XEvent e;
+    KeySym ks = 0;
+    char buf[2];
+    
+    if(XPending(dpy) > 0){
+        XNextEvent(dpy, &e);
+        switch(e.type){
+        case KeyPress:
+            XLookupString(&e.xkey, buf, 1, &ks, NULL);
+            switch(buf[0]){
+            case 'x':
+                menu_id = SCANNER_3D_MENU;
+                scanner->controller.activate();
+                break;
+            }
+            break;
+        }
+    }
 }
 
 void handle_adsr_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel_x){
@@ -431,6 +454,10 @@ void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono)
                 break;
             case 'a':
                 menu_id = ADSR_MENU;
+                break;
+            case 'e':
+                scanner->reverb.activate();
+                menu_id = REVERB_MENU;
                 break;
             case '?':
                 print_keybindings();
@@ -1098,11 +1125,21 @@ void* window_thread(void*){
         draw_adsr_menu(dpy, w, gc, node_sel_x);
         handle_adsr_menu(dpy, w, gc, menu_id, node_sel_x);
         break;
+    case REVERB_MENU:
+        scanner->reverb.draw_reverb(dpy, w, gc);
+        handle_reverb_menu(dpy, w, gc, menu_id);
+        break;
     default: //Never get here. Pls.
         break;
     }
+
+    if(menu_id == REVERB_MENU){
+        scanner->reverb.update_params();
+    }
+    else{
+        scanner->update_params();    
+    }
     
-    scanner->update_params();
     origin = scanner->origin;
     scanner_rot = scanner->scanner_rot;
     

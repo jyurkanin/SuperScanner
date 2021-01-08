@@ -35,7 +35,7 @@
 #define EQ_POS_MENU 7
 #define INFO_MENU 8
 #define ADSR_MENU 9
-
+#define REVERB_MENU 10
 
 //xdrawstring character width is 6 pixels. height I think is 8
 

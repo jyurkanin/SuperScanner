@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <fstream>
-
+#include "reverb.h"
 #include "controller.h"
 #ifdef Success //this is stupid
   #undef Success
@@ -52,6 +52,7 @@ public:
   int *node_damping;
   int *node_mass;
   
+  Reverb reverb;
   
 //private:
   static void* simulate_wrapper(void*);

@@ -2,16 +2,13 @@ CFLAGS= -g -D__LINUX_ASLA -Wall -O3
 LIBS= -lm -lpthread -lasound -lX11
 
 
-all: main.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engine.o
-	g++ -o scan main.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engine.o  $(CFLAGS) $(LIBS)
+all: main.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engine.o reverb.o
+	g++ -o scan main.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engine.o reverb.o  $(CFLAGS) $(LIBS)
 
-test: test.cpp super_scanner.o super_scanner_fast.o controller.o wavfile.o scanner_window.o audio_engine.o
-	g++ -o test test.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engine.o  $(CFLAGS) $(LIBS)	
-
-
-
-super_scanner_fast.o: super_scanner_fast.cpp
-	g++ -c super_scanner_fast.cpp  -O3 $(CFLAGS) $(LIBS)
+test_reverb: test.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engine.o reverb.o
+	g++ -o test test.cpp super_scanner.o reverb.o controller.o wavfile.o scanner_window.o audio_engine.o  $(CFLAGS) $(LIBS)
+reverb.o: reverb.cpp
+	g++ -c reverb.cpp  -O3 $(CFLAGS) $(LIBS)
 
 super_scanner.o: super_scanner.cpp
 	g++ -c super_scanner.cpp  -O3 $(CFLAGS) $(LIBS)

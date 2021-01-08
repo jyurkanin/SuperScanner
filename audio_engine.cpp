@@ -188,15 +188,19 @@ void *audio_thread(void *arg){
         }
         
         int idx = 0;
+        float sample_l, sample_r;
+        float adsr_gain;
         for(int j = 0; j < frames_to_deliver; j++){
             temp_sample = oversample_frames[idx];
-            //compress_audio(float in, float attack, float threshold, float ratio);
-            temp_sample = compress_audio(temp_sample, 100, .05, .01);
-            temp_sample = temp_sample*scanner->get_adsr_gain();
             
+            scanner->reverb.tick(temp_sample, temp_sample, sample_l, sample_r);
+            adsr_gain = scanner->get_adsr_gain();
             
-            stereo_frames[2*j] = temp_sample;
-            stereo_frames[2*j + 1] = temp_sample;
+            sample_l = adsr_gain*compress_audio(sample_l, 100, .05, .01, 0);
+            sample_r = adsr_gain*compress_audio(sample_r, 100, .05, .01, 1);
+            
+            stereo_frames[2*j] = sample_l;
+            stereo_frames[2*j + 1] = sample_r;
             idx += scanner->oversample_factor;
         }
 
@@ -388,35 +392,38 @@ void *midi_loop(void *ignoreme){
  *
  */
 
-float out_rms = 0;
-float curr_rms = 0; //lpf rms.
-float compress_audio(float in, float attack, float threshold, float ratio){
+float out_rms[2] = {0,0};
+float curr_rms[2] = {0,0}; //lpf rms.
+float compress_audio(float in, float attack, float threshold, float ratio, int channel){
     float in_rms = fabs(in); //oh this isnt actually the root-mean-square. oh rip.
     float out;
     
-    curr_rms += (in_rms - curr_rms)/attack;
+    curr_rms[channel] += (in_rms - curr_rms[channel])/attack; //Look at this stupid ass approximation of the signal amplitude.
 
-    float norm_sample = in / curr_rms;
+    float norm_sample = 0;
+    //if(curr_rms != 0)
+    norm_sample = in / std::max(curr_rms[channel], 1e-3f);
+    
 
     
-    if(curr_rms > threshold){
-        out_rms = (threshold + ((curr_rms - threshold)*ratio));
-        out = norm_sample*out_rms;
+    if(curr_rms[channel] > threshold){
+        out_rms[channel] = (threshold + ((curr_rms[channel] - threshold)*ratio));
+        out = norm_sample*out_rms[channel];
     }
     else{
-        out_rms = curr_rms;
-        out = norm_sample*curr_rms;
+        out_rms[channel] = curr_rms[channel];
+        out = norm_sample*curr_rms[channel];
     }
     
     return out;
 }
 
 float get_curr_rms(){
-    return curr_rms;
+    return curr_rms[0];
 }
 
 float get_out_rms(){
-    return out_rms;
+    return out_rms[0];
 }
 
 
