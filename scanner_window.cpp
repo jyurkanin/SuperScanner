@@ -24,6 +24,29 @@ unsigned get_adsr_color(unsigned color){
     return (scaled_color & color) + 0x00FF;
 }
 
+void get_string(char* number){ //read the keyboard for a string
+    XEvent e;
+    char buf[2];
+    KeySym ks = 0;
+    int count = 0;
+    do{
+        if(XPending(dpy) > 0){
+            XNextEvent(dpy, &e);
+            if(e.type == KeyPress){
+                XLookupString(&e.xkey, buf, 1, &ks, NULL);
+                if(ks == 0xFF0D){
+                    number[count] = 0;
+                    return;
+                }
+                number[count] = buf[0];
+                XDrawString(dpy, w, gc, (14+count)*8, 100, buf, 1);
+                XFlush(dpy);
+                count++;
+            }
+        }
+    } while(1);
+}
+
 int get_num(){ //read the keyboard for a number
     XEvent e;
     KeySym ks = 0;
@@ -37,9 +60,9 @@ int get_num(){ //read the keyboard for a number
             if(e.type == KeyPress){
                 XLookupString(&e.xkey, buf, 1, &ks, NULL);
                 if(isdigit(buf[0])){
-		  number[count] = buf[0];
-		  count++;
-		}
+                    number[count] = buf[0];
+                    count++;
+                }
             }
         }
     } while(ks != 0xFF0D);
@@ -55,11 +78,11 @@ void draw_float(Display *dpy, Window w, GC gc, int x, int y, float num, int deci
 }
 
 void print_keybindings(){
-    int num_keys = 14; //number of elements in following array.
+    int num_keys = 16; //number of elements in following array.
     const char *help_msg[] = {
         "? - Keybinding List",
         "m - toggle mono/stereo view",
-        "s - Edit scan Path",
+        "t - Edit scan Path",
         "n - Mass Table",
         "d - Damping Table",
         "c - Connectivity Menu",
@@ -71,12 +94,79 @@ void print_keybindings(){
         "l - Edit equilibrium position table",
         "y - Rotate viewer",
         "i - info screen",
-        "a - envelope screen"
+        "a - envelope screen",
+        "s - Save program",
+        "l - Load program",
+        "b - Cool visualization"
     };
     for(int i = 0; i < num_keys; i++){
         XDrawString(dpy, w, gc, 180, 20+(i*16), help_msg[i], strlen(help_msg[i]));
     }
     get_num(); //wait for enter.
+}
+
+
+void draw_visual_menu(Display *dpy, Window w, GC gc, int mono){
+    static unsigned count = 0;
+    
+    Vector3f temp[scanner->scan_len];
+    Vector3f start[scanner->scan_len-1];
+    Vector3f end[scanner->scan_len-1];
+
+    Matrix3f rot = get_rotation(0, -.2, 0);
+
+    origin[0] = 0;
+    origin[1] = 0;
+    origin[2] = 8;
+    int offset_x = 4;
+    for(int i = 0; i < scanner->scan_len; i++){
+        temp[i][0] = count*.0001f*(1+count*.1)*(1+count*.1) + offset_x;
+        temp[i][1] = 15*(((float)i/(scanner->scan_len - 1.0f)) - .5);
+        temp[i][2] = scanner->scan_table[i]*.5;
+        
+        temp[i] = rot*temp[i];
+    }
+    for(int i = 0; i < scanner->scan_len-1; i++){
+        start[i] = temp[i];
+        end[i] = temp[i+1];
+    }
+    
+    unsigned color = 0x00FF00;//get_adsr_color(0xFF0000); //Better color thing here.
+    if(mono){
+        XSetForeground(dpy, gc, color);
+        draw_mono_lines(start, end, scanner->scan_len);
+    }
+    else{
+        XSetForeground(dpy, gc, color);
+        draw_stereo_lines(start, end, scanner->scan_len);
+    }
+
+    count++;
+    if(scanner->has_strike_visual){
+        count = 0;
+        scanner->has_strike_visual = 0;
+        XClearWindow(dpy, w);
+    }
+}
+
+void handle_visual_menu(Display *dpy, Window w, GC gc, int &menu_id){
+    XEvent e;
+    KeySym ks = 0;
+    char buf[2];
+    
+    if(XPending(dpy) > 0){
+        XNextEvent(dpy, &e);
+        switch(e.type){
+        case KeyPress:
+            XLookupString(&e.xkey, buf, 1, &ks, NULL);
+            switch(buf[0]){
+            case 'x':
+                menu_id = SCANNER_3D_MENU;
+                break;
+            }
+            break;
+        }
+    }
 }
 
 
@@ -393,6 +483,7 @@ void draw_scanner(Display *dpy, Window w, GC gc, int mono){
 void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono){
     XEvent e;
     char buf[2];
+    char filename[100];
     
     //MAIN MENU
     if(XPending(dpy) > 0){
@@ -406,7 +497,7 @@ void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono)
             case 'm':
                 mono = !mono;
                 break;
-            case 's':
+            case 't':
                 scanner->sim_mutex = 1;
                 menu_id = SCAN_PATH_MENU;
                 break;
@@ -439,7 +530,7 @@ void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono)
                 scanner->sim_mutex = 1;
                 menu_id = CONSTRAINT_MENU;
                 break;
-            case 'l':
+            case 'q':
                 scanner->sim_mutex = 1;
                 menu_id = EQ_POS_MENU;
                 break;
@@ -458,6 +549,19 @@ void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono)
             case 'e':
                 scanner->reverb.activate();
                 menu_id = REVERB_MENU;
+                break;
+            case 'l':
+                XDrawString(dpy, w, gc, 8*8, 100, "Load: ", 6);
+                get_string(filename);
+                scanner->load(filename);
+                break;
+            case 's':
+                XDrawString(dpy, w, gc, 8*8, 100, "Save: ", 6);
+                get_string(filename);
+                scanner->save(filename);
+                break;
+            case 'b': //o for observe.
+                menu_id = VISUAL_MENU;
                 break;
             case '?':
                 print_keybindings();
@@ -1065,15 +1169,19 @@ void* window_thread(void*){
   int node_sel_y = 0;
   
   int flag = 0;
+  int should_clear = 1;
   
   XSetBackground(dpy, gc, 0);
   while(is_window_open()){
-    XClearWindow(dpy, w);
+    if(should_clear){
+        XClearWindow(dpy, w);
+    }
     switch(menu_id){
     case SCANNER_3D_MENU: //Main Menu Section=============================================
         draw_scanner(dpy, w, gc, mono);
         handle_scanner_menu(dpy, w, gc, menu_id, mono);
         flag = 1;
+        should_clear = 1;
         break;
     case SCAN_PATH_MENU: //Scan Path Selection Menu=================================
         draw_scan_path_menu(dpy, w, gc, node_sel);
@@ -1128,6 +1236,14 @@ void* window_thread(void*){
     case REVERB_MENU:
         scanner->reverb.draw_reverb(dpy, w, gc);
         handle_reverb_menu(dpy, w, gc, menu_id);
+        break;
+    case VISUAL_MENU:
+        if(flag){
+            flag = 0;
+            should_clear = 0;
+        }
+        draw_visual_menu(dpy, w, gc, mono);
+        handle_visual_menu(dpy, w, gc, menu_id);
         break;
     default: //Never get here. Pls.
         break;

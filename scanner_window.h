@@ -36,6 +36,7 @@
 #define INFO_MENU 8
 #define ADSR_MENU 9
 #define REVERB_MENU 10
+#define VISUAL_MENU 11
 
 //xdrawstring character width is 6 pixels. height I think is 8
 
@@ -83,6 +84,7 @@ void* window_thread(void*);
 void draw_scanner(Display *dpy, Window w, GC gc, int mono);
 void handle_scanner_menu(Display *dpy, Window w, GC gc, int &menu_id, int &mono);
 
+void handle_visual_menu(Display *dpy, Window w, GC gc);
 void handle_adsr_menu(Display *dpy, Window w, GC gc, int &menu_id);
 void handle_eq_pos_menu(Display *dpy, Window w, GC gc, int &node_sel_x, int &node_sel_y, int &menu_id);
 void handle_scanner_2d_menu(Display *dpy, Window w, GC gc, int &menu_id);
@@ -94,6 +96,7 @@ void handle_node_constraint_menu(Display *dpy, Window w, GC gc, int &menu_id, in
 void handle_scanner_node_menu(Display *dpy, Window w, GC gc, int &menu_id, int &node_sel, int *params, int max);
 void handle_info_menu(Display *dpy, Window w, GC gc, int &menu_id);
 
+void draw_visual_menu(Display *dpy, Window w, GC gc, int mono);
 void draw_adsr_menu(Display *dpy, Window w, GC gc, int node_sel_x);
 void draw_eq_pos_menu(Display *dpy, Window w, GC gc, int node_sel_x, int node_sel_y);
 void draw_scanner_2d_menu(Display *dpy, Window w, GC gc);

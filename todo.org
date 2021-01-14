@@ -8,7 +8,6 @@ SuperScanner Todo List
   Do oversampling.
 
 * DONE Implement Network ODE
-
 * DONE Integrate with Existing Code
 ** DONE AudioEngine integration
 ** DONE Midi Integration
@@ -110,7 +109,10 @@ SuperScanner Todo List
   Also rainbow over time. Could be scaled with ADSR gains
   so that the scan path reaches the end when the release
   of the gain times out. idk how that would work though because
-  sustain is a variable time thing.
+  sustain is a variable time thing. 
+  Is Currently quite sick.
+  Could use some shading work though.
+  
 * DONE Runge-Kutta instead of Euler
   Better accuracy. Less oscillation. Possibly a bit faster.
   I dont notice any difference in sound. It does seem more accurate
@@ -161,7 +163,8 @@ SuperScanner Todo List
    Replace connection matrix nested for loop with precomputed sorted list of connections.
    Could be kinda difficult and might not even improve speed that much.
 
-* TODO Save and Load
+* DONE Save and Load
+  Test completed.
   Would be extremely useful.
 * DONE Better Scan Path Interpolation
   Need to do a first order interp between old table and new table.
@@ -211,6 +214,8 @@ Hard:
   spectrum analysis. But audibly it is definitely improved. I tried at 8x oversampling
   But that seemed to lowpass the signal way too much. It did more than antialias. It was
   Just lowpassing the signal a ton.
+  
+  I should make recordings in audacity and comare the different filters' effects.
 
 * DONE Level Controller for adjusting volume
   Control output amplitude at constant level.

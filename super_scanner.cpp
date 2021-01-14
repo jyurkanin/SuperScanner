@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <algorithm>
 #include <stdlib.h>
-
+#include <fstream>
 
 void break_on_me(){}
   
@@ -172,7 +172,8 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
 
   pad_mode = 0;
   k_ = 0;
-  setHammer(55); //Nice. I like this function. Really gets the job done.
+  //setHammer(55); //Nice. I like this function. Really gets the job done.
+  has_strike_visual = 0;
 }
 
 SuperScanner::~SuperScanner(){
@@ -189,6 +190,10 @@ SuperScanner::~SuperScanner(){
   delete[] node_vel;
   delete[] node_acc;
 }
+
+
+
+
 
 /* cases:
  * note is > 0 and !release : portamento to note
@@ -344,7 +349,7 @@ float SuperScanner::get_adsr_gain(){
 void SuperScanner::compute_scan_table(){
     float sum;
     Vector3f temp;
-    int select = scan_method/10;
+    int select = floorf(scan_method/42.0f);
     for(int i = 0; i < scan_len; i++){
         switch(select){
         case 0:
@@ -363,8 +368,8 @@ void SuperScanner::compute_scan_table(){
 }
 
 void* SuperScanner::simulate_wrapper(void *context){
-  ((SuperScanner*)context)->simulate();
-  return 0;
+    ((SuperScanner*)context)->simulate();
+    return 0;
 }
 
 void SuperScanner::solveRungeKutta(Vector3f *X, Vector3f *X1){
@@ -588,6 +593,7 @@ void SuperScanner::strike(){
     //node_acc[i][2] = 0;
   }
   sim_mutex = 0;
+  has_strike_visual = 1;
 }
 
 int SuperScanner::start(){
@@ -682,5 +688,103 @@ void SuperScanner::update_params(){
     
     pad_mode = !controller.get_button(0);
   }
+  
+}
+
+void SuperScanner::save(char *fn){
+    std::ofstream ofs;
+    ofs.open(fn, std::ofstream::out);
+    
+    ofs << num_nodes << ',';
+    ofs << timestep << ',';
+    ofs << scan_len << ',';
+    
+    
+    for(int i = 0; i < 9; i++){
+        ofs << (int)controller.get_slider(i) << ',' << (int)controller.get_knob(i) << ',' << (int)controller.get_button(i) << ',';
+    }
+    
+    for(int i = 0; i < 9; i++){
+        ofs << (int) reverb.controller.get_slider(i) << ',' << (int) reverb.controller.get_knob(i) << ',' << (int) reverb.controller.get_button(i) << ',';
+    }
+    
+    for(int i = 0; i < num_nodes; i++){
+        ofs << node_damping[i] << ',' << node_mass[i] << ',' << constrained_nodes[i] << ',';
+    }
+    
+    for(int i = 0; i < num_nodes; i++){
+        ofs << node_eq_pos[i][0] << ',' << node_eq_pos[i][1] << ',' << node_eq_pos[i][2] << ',';
+    }
+    
+    for(int i = 0; i < scan_len; i++){
+        ofs << scan_path[i] << ',';
+    }
+    
+    for(int i = 0; i < (num_nodes*num_nodes); i++){
+        ofs << stiffness_matrix[i] << ',' << displacement_matrix[i] << ',';
+    }
+
+    for(unsigned i = 0; i < adsr_table_len; i++){
+        ofs << adsr_table[i][0] << ',' << adsr_table[i][1] << ',';
+    }
+    
+    ofs.close();
+}
+
+void SuperScanner::load(char *fn){
+    char comma; //Yes, this is stupid. No, I don't care.
+    std::ifstream ifs;
+    ifs.open(fn);
+    
+    ifs >> num_nodes >> comma;
+    ifs >> timestep >> comma;
+    ifs >> scan_len >> comma;
+
+        
+    for(int i = 0; i < 9; i++){
+        ifs >> controller.slider[i] >> comma; //        printf("slider %d %c\n", controller.slider[i], comma);
+        ifs >> controller.knob[i] >> comma;
+        ifs >> controller.button[i] >> comma;
+    }
+    
+    for(int i = 0; i < 9; i++){
+        ifs >> reverb.controller.slider[i] >> comma;
+        ifs >> reverb.controller.knob[i] >> comma;
+        ifs >> reverb.controller.button[i] >> comma;
+    }
+    
+    for(int i = 0; i < num_nodes; i++){
+        ifs >> node_damping[i] >> comma;
+        ifs >> node_mass[i] >> comma;
+        ifs >> constrained_nodes[i] >> comma;
+    }
+    
+    for(int i = 0; i < num_nodes; i++){
+        ifs >> node_eq_pos[i][0] >> comma;
+        ifs >> node_eq_pos[i][1] >> comma;
+        ifs >> node_eq_pos[i][2] >> comma;
+    }
+    
+    for(int i = 0; i < scan_len; i++){
+        ifs >> scan_path[i] >> comma;
+    }
+    
+    for(int i = 0; i < (num_nodes*num_nodes); i++){
+        ifs >> stiffness_matrix[i] >> comma;
+        ifs >> displacement_matrix[i] >> comma;
+    }
+
+    for(unsigned i = 0; i < adsr_table_len; i++){
+        ifs >> adsr_table[i][0] >> comma;
+        ifs >> adsr_table[i][1] >> comma;
+    }
+    
+    ifs.close();
+    
+    controller.set_new_data();
+    update_params();
+    
+    reverb.controller.set_new_data();
+    reverb.update_params();
 }
 

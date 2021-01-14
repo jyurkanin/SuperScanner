@@ -5,7 +5,7 @@ LIBS= -lm -lpthread -lasound -lX11
 all: main.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engine.o reverb.o
 	g++ -o scan main.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engine.o reverb.o  $(CFLAGS) $(LIBS)
 
-test_reverb: test.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engine.o reverb.o
+test: test.cpp super_scanner.o controller.o wavfile.o scanner_window.o audio_engine.o reverb.o
 	g++ -o test test.cpp super_scanner.o reverb.o controller.o wavfile.o scanner_window.o audio_engine.o  $(CFLAGS) $(LIBS)
 reverb.o: reverb.cpp
 	g++ -c reverb.cpp  -O3 $(CFLAGS) $(LIBS)

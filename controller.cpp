@@ -117,6 +117,10 @@ int Controller::has_new_data(){
   return 0;
 }
 
+void Controller::set_new_data(){
+    has_new = 1;
+}
+
 void *Controller::read_controller(void *nothing){
     unsigned char packet[4];
     has_new = 1;

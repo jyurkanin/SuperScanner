@@ -42,13 +42,14 @@ public:
   int stop();
 
   const int oversample_factor = 2;
-  const int num_nodes;
+  int num_nodes;
   Vector3f *node_pos;
   float *stiffness_matrix; //Oh boyo. Upper triangular. to avoid repetition.
   volatile int sim_mutex;
   volatile int has_scan_update; //volatile just in case.
   int scan_len; //size of the table getting scanned
   int *scan_path;
+  
   int *node_damping;
   int *node_mass;
   
@@ -61,6 +62,9 @@ public:
   void solveRungeKutta(Vector3f *X, Vector3f *X1);
   void solveForwardEuler(Vector3f *X, Vector3f *X1);
   
+  void save(char *fn);
+  void load(char *fn);
+  
   float freqs[12] = {27.5, 29.135, 30.868, 32.703, 34.648, 36.708, 38.891, 41.203, 43.654, 46.249, 48.999, 51.913}; // frequencies of the lowest octave
   Controller controller;
   
@@ -72,19 +76,23 @@ public:
   int hammer_num;
   float timestep;
   int sample_rate;
+  
   float m_volume;
   float release_stiffness;
   float release_damping;
   float mass_bias;
   float damping_bias;
   float stiffness_bias;
+  
   float test_knob;
   
   uint32_t k_;
   float *scan_table;
   float *old_scan_table;
   float *hammer_table;
+
   float *displacement_matrix; //Also upper triangular. Represents the equillibrium length of the spring connecting two nodes.
+  
   int *constrained_nodes;
   Vector3f *node_eq_pos;
   float restoring_stiffness;
@@ -111,5 +119,7 @@ public:
   Vector3f *k2;
   Vector3f *k3;
   Vector3f *k4;
-
+  
+  
+  int has_strike_visual; //this is just for reporting to scanner_window.draw_visual_menu
 };

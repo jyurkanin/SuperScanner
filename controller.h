@@ -23,6 +23,7 @@ class Controller{
   unsigned char was_loop_back_pressed();
   unsigned char was_fastforward_pressed();
   unsigned char was_rewind_pressed();
+  static void set_new_data();
   static int has_new_data();
   static int init_controller(int argc, char *argv[]);
   static int exit_controller();

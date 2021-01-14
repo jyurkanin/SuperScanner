@@ -21,7 +21,7 @@ public:
     void draw_reverb(Display *dpy, Window w, GC gc);
     void activate(){controller.activate();}
     void update_params();
-private:
+//private:
     float fdbk_rot_matrix[3][3];
     float ffwd_rot_matrix[5][2][2];
     float gain;
