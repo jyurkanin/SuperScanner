@@ -38,5 +38,9 @@ void *audio_thread(void *arg);
 //Dsp functions
 
 float compress_audio(float in, float attack, float threshold, float ratio, int channel);
+float anti_alias2(float in);
+float anti_alias4(float in);
+float anti_alias8(float in);
+float remove_dc_bias(float in, int channel);
 float get_curr_rms();
 float get_out_rms();

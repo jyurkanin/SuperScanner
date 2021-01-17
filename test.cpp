@@ -167,6 +167,40 @@ void test_save_load(){
     
 }
 
+//test filters by running them on noise.
+void test_aa_filter(){
+    std::ofstream ofs;
+    ofs.open("log.csv", std::ofstream::out);
+    ofs << "X,Y\n";
+    
+    srand(1);
+    float temp;
+    float sr = 44100*8;
+    for(int i = 0; i < 44100; i ++){
+        temp = ((float)rand()/RAND_MAX) + sinf(2*M_PI*14000.0*i/sr) + sinf(2*M_PI*16000.0*i/sr) + sinf(2*M_PI*18000.0*i/sr) + sinf(2*M_PI*20000.0*i/sr) + sinf(2*M_PI*30000.0*i/sr) + sinf(2*M_PI*40000.0*i/sr);
+        ofs << temp << ',' << anti_alias8(temp) << '\n';
+    }
+    ofs.close();
+    //run python3 test_aa_filter.py to complete test.
+}
+
+//test high pass filter on noise.
+//Also test if DC bias is eliminated.
+void test_hpf(){
+    std::ofstream ofs;
+    ofs.open("log.csv", std::ofstream::out);
+    ofs << "X,Y\n";
+    
+    srand(1);
+    float temp = 1;
+    for(int i = 0; i < 44100; i ++){
+        temp = ((float)rand()/RAND_MAX) + sinf(2*M_PI*440.0*i/44100.0);
+        ofs << temp << ',' << remove_dc_bias(temp, 0) << '\n';
+    }
+    ofs.close();
+}
+
 int main(int argc, char *argv[]){
-    test_save_load();
+    test_aa_filter();
+    printf("Done\n");
 }

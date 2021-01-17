@@ -112,6 +112,11 @@ SuperScanner Todo List
   sustain is a variable time thing. 
   Is Currently quite sick.
   Could use some shading work though.
+* TODO Spectrogram
+  Would be Sick. Also a little bit difficult. Oh well.
+* TODO DC Bias Elimination
+  Would help the compressors work better.
+  Possibly would help prevent clicks and pops.
   
 * DONE Runge-Kutta instead of Euler
   Better accuracy. Less oscillation. Possibly a bit faster.
@@ -194,7 +199,7 @@ SuperScanner Todo List
 * TODO Polyphony?
   Using the scanner as a main oscillator. Do polyphony. Kinda hard.
   Would have to add the result of all notes together and perform 
-  antialiasing at the end.
+  antialiasing at the end. It would also really make adsr work easier though.
   
 * DONE Add the Reverb
   Hopefully I can just copy paste the code I already wrote.

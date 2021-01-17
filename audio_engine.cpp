@@ -127,6 +127,22 @@ float anti_alias2(float in){
     return y[0];
 }
 
+float remove_dc_bias(float in, int channel){
+    float num[] = {1.0, -1.0};
+    float den[] = {1., -.999};
+    
+    static float x[2][5] = {{0,0,0,0,0},{0,0,0,0,0}};
+    static float y[2][5] = {{0,0,0,0,0},{0,0,0,0,0}};
+    
+    x[channel][0] = in;
+    y[channel][0] = (x[channel][0]*num[0]) + (x[channel][1]*num[1]) - (y[channel][1]*den[1]);
+
+    y[channel][1] = y[channel][0];
+    x[channel][1] = x[channel][0];
+    
+    return y[channel][1];
+}
+
 void *audio_thread(void *arg){
     float oversample_frames[441*scanner->oversample_factor];
     float sum_frames[441];
@@ -190,14 +206,18 @@ void *audio_thread(void *arg){
         int idx = 0;
         float sample_l, sample_r;
         float adsr_gain;
+        float amplitude = 4*scanner->m_volume * volume / 127.0;
         for(int j = 0; j < frames_to_deliver; j++){
             temp_sample = oversample_frames[idx];
             
             scanner->reverb.tick(temp_sample, temp_sample, sample_l, sample_r);
             adsr_gain = scanner->get_adsr_gain();
             
-            sample_l = adsr_gain*compress_audio(sample_l, 100, .05, .01, 0);
-            sample_r = adsr_gain*compress_audio(sample_r, 100, .05, .01, 1);
+            sample_l = remove_dc_bias(sample_l, 0);
+            sample_r = remove_dc_bias(sample_r, 1);
+            
+            sample_l = amplitude*adsr_gain*compress_audio(sample_l, 100, .05, .01, 0);
+            sample_r = amplitude*adsr_gain*compress_audio(sample_r, 100, .05, .01, 1);
             
             stereo_frames[2*j] = sample_l;
             stereo_frames[2*j + 1] = sample_r;
