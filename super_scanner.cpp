@@ -243,7 +243,7 @@ float SuperScanner::tick(int note, float volume){
   
   k_++;
   was_released = release_flag;
-  return i_sample * .2*m_volume * volume / 127.0;
+  return i_sample * .2;
 }
 
 void SuperScanner::sort_adsr_table(){

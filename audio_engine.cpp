@@ -419,12 +419,12 @@ float compress_audio(float in, float attack, float threshold, float ratio, int c
     float out;
     
     curr_rms[channel] += (in_rms - curr_rms[channel])/attack; //Look at this stupid ass approximation of the signal amplitude.
-
+    
     float norm_sample = 0;
     //if(curr_rms != 0)
     norm_sample = in / std::max(curr_rms[channel], 1e-3f);
     
-
+    
     
     if(curr_rms[channel] > threshold){
         out_rms[channel] = (threshold + ((curr_rms[channel] - threshold)*ratio));

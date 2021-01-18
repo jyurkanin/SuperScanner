@@ -1,5 +1,6 @@
 #include "scanner_window.h"
 #include "super_scanner.h"
+#include "audio_engine.h"
 #include <algorithm>
 #include <ctype.h>
 #include <string.h>
@@ -122,7 +123,7 @@ void draw_visual_menu(Display *dpy, Window w, GC gc, int mono){
     for(int i = 0; i < scanner->scan_len; i++){
         temp[i][0] = count*.0001f*(1+count*.1)*(1+count*.1) + offset_x;
         temp[i][1] = 15*(((float)i/(scanner->scan_len - 1.0f)) - .5);
-        temp[i][2] = scanner->scan_table[i]*.5;
+        temp[i][2] = scanner->scan_table[i]*.03 / get_curr_rms();
         
         temp[i] = rot*temp[i];
     }
@@ -290,9 +291,9 @@ void draw_scanner_2d_menu(Display *dpy, Window w, GC gc){
     XSegment scan_segs[scanner->scan_len];
     for(int i = 0; i < scanner->scan_len-1; i++){
         scan_segs[i].x1 = i*interval_x;
-        scan_segs[i].y1 = (SCREEN_HEIGHT/2) + scanner->scan_table[i]*50;
+        scan_segs[i].y1 = (SCREEN_HEIGHT/2) + scanner->scan_table[i]/get_curr_rms();
         scan_segs[i].x2 = (i+1)*interval_x;
-        scan_segs[i].y2 = (SCREEN_HEIGHT/2) + scanner->scan_table[i+1]*50;
+        scan_segs[i].y2 = (SCREEN_HEIGHT/2) + scanner->scan_table[i+1]/get_curr_rms();
     }
 
     unsigned color = get_adsr_color(0xFF0000);
