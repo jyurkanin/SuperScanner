@@ -136,14 +136,11 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
   
   
   for(int i = 0; i < num_nodes; i++){
-      node_eq_pos[i] = Vector3f(0, i*4, 0);
-      node_pos[i] = Vector3f(0, i*4, 0);
+      node_eq_pos[i] = Vector3f(0, i, 0);
+      node_pos[i] = Vector3f(0, i, 0);
       node_vel[i] = Vector3f(0, 0, 0);
   }
 
-  constrained_nodes[0] = 1;
-  constrained_nodes[63] = 1;
-  
   /*
   for(int i = 0; i < side_len; i++){
       for(int j = 0; j < side_len; j++){

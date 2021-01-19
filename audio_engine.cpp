@@ -213,8 +213,8 @@ void *audio_thread(void *arg){
             scanner->reverb.tick(temp_sample, temp_sample, sample_l, sample_r);
             adsr_gain = scanner->get_adsr_gain();
             
-            sample_l = remove_dc_bias(sample_l, 0);
-            sample_r = remove_dc_bias(sample_r, 1);
+            //sample_l = remove_dc_bias(sample_l, 0);
+            //sample_r = remove_dc_bias(sample_r, 1);
             
             sample_l = amplitude*adsr_gain*compress_audio(sample_l, 100, .05, .01, 0);
             sample_r = amplitude*adsr_gain*compress_audio(sample_r, 100, .05, .01, 1);
