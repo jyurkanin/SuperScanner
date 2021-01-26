@@ -4,25 +4,18 @@ import numpy as np
 from scipy import signal
 
 
-df = pd.read_csv('log.csv')
+df = pd.read_csv('log_file.csv')
 temp = df.values
 
-print("Shape", temp.shape)
+
+plt.plot(temp[:,0])
+plt.show()
 
 
-f, t, Sxx = signal.spectrogram(temp[:,0], 88200, detrend=False)
+f, t, Sxx = signal.spectrogram(temp[:,0], 44100, detrend=False, nfft=1024)
 
 plt.pcolormesh(t, f, Sxx)
 plt.ylabel('Frequency [Hz]')
 plt.xlabel('Time [sec]')
 plt.show()
 
-
-
-
-f, t, Sxx = signal.spectrogram(temp[:,1], 88200, detrend=False)
-
-plt.pcolormesh(t, f, Sxx)
-plt.ylabel('Frequency [Hz]')
-plt.xlabel('Time [sec]')
-plt.show()

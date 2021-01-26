@@ -114,10 +114,11 @@ SuperScanner Todo List
   Could use some shading work though.
 * TODO Spectrogram
   Would be Sick. Also a little bit difficult. Oh well.
-* TODO DC Bias Elimination
+* DONE DC Bias Elimination
   Would help the compressors work better.
   Possibly would help prevent clicks and pops.
-  
+  DOesn't accomplish much or anything.
+
 * DONE Runge-Kutta instead of Euler
   Better accuracy. Less oscillation. Possibly a bit faster.
   I dont notice any difference in sound. It does seem more accurate
@@ -153,8 +154,12 @@ SuperScanner Todo List
   Additionally the Jacobian would have to be inverted and that would very intensive.
 
   So this is not going to happen.
-  
-  
+
+* TODO SINC Interpolation
+  Use the sinc function to interpolate instead of linear interpolation.
+  This results in a band limited interpolation. Very smart.
+  Could possibly continue to need somework. Implement a circular queue?
+
 * Speed Hacks
 ** Structure of Arrays instead Array of Structures
    Use 3 arrays for X,Y,Z instead of an array of X,Y,Z vectors

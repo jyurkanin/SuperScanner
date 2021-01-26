@@ -200,7 +200,18 @@ void test_hpf(){
     ofs.close();
 }
 
+void test_tick(){
+    SuperScanner scanner(64);
+    scanner.start();
+    //scanner.strike();
+    //scanner.startNote();
+    for(int i = 0; i < 1024; i++){
+        scanner.tick(60, 1);
+    }
+    scanner.stop();
+}
+
 int main(int argc, char *argv[]){
-    test_aa_filter();
+    test_tick();
     printf("Done\n");
 }

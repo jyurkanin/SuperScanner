@@ -169,7 +169,7 @@ SuperScanner::SuperScanner(int s) : num_nodes(s){
 
   pad_mode = 0;
   k_ = 0;
-  //setHammer(55); //Nice. I like this function. Really gets the job done.
+  setHammer(0); //Nice. I like this function. Really gets the job done.
   has_strike_visual = 0;
 }
 
@@ -198,6 +198,49 @@ SuperScanner::~SuperScanner(){
  * note is -1 and !release : hold same note.
  * note is -1 and release : Idk how this could hapen.
  */
+
+
+float SuperScanner::tick(int note, float volume){
+  static int was_released = 1;
+  static float p_freq = 0;
+  static float idx = 0;
+  
+  
+  float freq = 0;
+  if(note != -1){
+      freq = (freqs[(note-21) % 12] * (1 << (1+(int)(note-21)/12)))/2;
+  }
+  
+  if((note != -1) && was_released){p_freq = freq;}
+  else if((note != -1) && !was_released){p_freq += (freq - p_freq)/1000;}
+  
+  
+  compute_scan_table();
+  
+  float temp = p_freq*scan_len/((float)sample_rate);
+  idx = fmod(idx+temp, scan_len); //fmod(p_freq*k_*scan_len/((float)sample_rate), scan_len);
+  
+  int lower = floorf(idx);
+  float sample = 0;
+  for(int i = -31; i < 32; i++){
+      int m = i + lower;
+      float x_m = scan_table[(scan_len + m) % scan_len];
+      float temp = idx - m;
+      float h_n_m = temp == 0 ? 1: sinf(M_PI*temp)/(M_PI*temp);
+      sample += (x_m * h_n_m); //this is one of them converlutions.
+  }
+  
+  
+  k_++;
+  was_released = release_flag;
+  
+  //log_file << sample << "\n";
+  
+  return sample * .2;
+}
+
+
+/*
 float SuperScanner::tick(int note, float volume){
   static int was_released = 1;
   static float p_freq = 0;
@@ -229,19 +272,22 @@ float SuperScanner::tick(int note, float volume){
   //log_file << idx << "\n";
   
   int lower = floorf(idx);
+  int upper = (lower+1) % scan_len;
   float diff = idx - lower;
-  float sample = scan_table[lower]*(1-diff) + scan_table[lower+1]*(diff); //interpolate along scan table axis
-  float old_sample = old_scan_table[lower]*(1-diff) + old_scan_table[lower+1]*(diff);
+  float sample = scan_table[lower]*(1-diff) + scan_table[upper]*(diff); //interpolate along scan table axis
+  float old_sample = old_scan_table[lower]*(1-diff) + old_scan_table[upper]*(diff);
+  
   
   diff = std::min(1.0f, (k_ - k_update)/(sample_rate*timestep));
-  float i_sample = sample*diff + old_sample*(1-diff); //interpolate along time axis.
-  
-  
+  float i_sample = sample*diff + old_sample*(1-diff); //interpolate along time axis. This actually helps prevent clicking when note changes.
+
+  //log_file << i_sample << "\n";
   
   k_++;
   was_released = release_flag;
   return i_sample * .2;
 }
+*/
 
 void SuperScanner::sort_adsr_table(){
     //insertion sort because I'm stupid and the table is small.
@@ -415,7 +461,6 @@ void SuperScanner::solveRungeKutta(Vector3f *X, Vector3f *X1){
             node_pos[i] = X1[i];
             node_vel[i] = X1[i+num_nodes];
         }
-            
         has_scan_update = 1;
     }
 }
@@ -460,7 +505,8 @@ void SuperScanner::simulate(){
     k2 = new Vector3f[num_nodes*2];
     k3 = new Vector3f[num_nodes*2];
     k4 = new Vector3f[num_nodes*2];
-    
+
+    printf("Start simulator\n");
     while(is_window_open_){
         unsigned int usecs = 1000;
         gettimeofday(&start, NULL);
@@ -575,7 +621,7 @@ void SuperScanner::strike(){
   sim_mutex = 1;
   for(int i = 0; i < scan_len; i++){
     int n = scan_path[i];
-    if(constrained_nodes[n]) continue; //hammer doesnt affect constrained nodes.    
+    if(constrained_nodes[n]) continue; //hammer doesnt affect constrained nodes.
     node_pos[n][0] = node_eq_pos[n][0];
     node_pos[n][1] = node_eq_pos[n][1];
     node_pos[n][2] = hammer_table[i];
