@@ -158,7 +158,8 @@ void *audio_thread(void *arg){
     
     while(is_window_open()){
         snd_pcm_wait(playback_handle, 100);
-        frames_to_deliver = snd_pcm_avail_update(playback_handle);
+        //frames_to_deliver = snd_pcm_avail_update(playback_handle);
+        frames_to_deliver = snd_pcm_avail(playback_handle);
         if ( frames_to_deliver == -EPIPE){
             snd_pcm_prepare(playback_handle);
             printf("Epipe\n");
@@ -225,19 +226,6 @@ void *audio_thread(void *arg){
         }
 
       
-        /*
-          if(main_controller.get_button(2)){
-          for(int j = 0; j < frames_to_deliver; j++){
-          reverb.tick(sum_frames[j], sum_frames[j], stereo_frames[2*j], stereo_frames[2*j + 1]);
-          }
-          }
-          else{
-          for(int j = 0; j < frames_to_deliver; j++){
-          stereo_frames[2*j] = sum_frames[j]; //split
-          stereo_frames[2*j + 1] = sum_frames[j];
-          }
-          }
-        */
         while((err = snd_pcm_writei(playback_handle, stereo_frames, frames_to_deliver)) != frames_to_deliver && is_window_open()) {
             snd_pcm_prepare(playback_handle);
             fprintf(stderr, "write to audio interface failed (%s)\n", snd_strerror (err));

@@ -226,7 +226,7 @@ float SuperScanner::tick(int note, float volume){
       int m = i + lower;
       float x_m = scan_table[(scan_len + m) % scan_len];
       float temp = idx - m;
-      float h_n_m = temp == 0 ? 1: sinf(M_PI*temp)/(M_PI*temp);
+      float h_n_m = temp == 0 ? 1: sinf(M_PI_2*temp)/(M_PI_2*temp);
       sample += (x_m * h_n_m); //this is one of them converlutions.
   }
   
